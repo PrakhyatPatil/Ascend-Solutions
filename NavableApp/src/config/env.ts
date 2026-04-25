@@ -1,6 +1,7 @@
 export const APP_CONFIG = {
-  apiBaseUrl: 'https://example.execute-api.ap-south-1.amazonaws.com/prod',
+  apiBaseUrl: 'https://6ksep4avie2xopo6wnadojzpni0bwgpo.lambda-url.us-east-1.on.aws',
   apiVersion: '1',
+  enableRemoteSos: false,
   defaultUserId: 'u_123',
   defaultCenter: {
     lat: 22.7196,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineBanner } from './src/components/OfflineBanner';
@@ -14,12 +14,21 @@ import { speakText } from './src/services/ttsService';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { MapScreen } from './src/screens/MapScreen';
 import { SafetyScreen } from './src/screens/SafetyScreen';
-import { HazardEvent, PinRecord } from './src/types/contracts';
+import { AuthScreen } from './src/screens/AuthScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { APP_CONFIG } from './src/config/env';
+import { queryVoiceAgent } from './src/services/voiceService';
+import { HazardEvent, PinRecord, VoiceQueryResponse } from './src/types/contracts';
 
-type TabName = 'Home' | 'Map' | 'Safety';
+type TabName = 'home' | 'map' | 'safety';
+type AppFlow = 'onboarding' | 'auth' | 'main' | 'profile';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabName>('Home');
+  const [activeTab, setActiveTab] = useState<TabName>('home');
+  const [appFlow, setAppFlow] = useState<AppFlow>('onboarding');
+  const [showSplash, setShowSplash] = useState(true);
+  const [splashOpacity] = useState(new Animated.Value(1));
   const [isOnline, setIsOnline] = useState(true);
   const [pins, setPins] = useState<PinRecord[]>([]);
   const [pinsLoading, setPinsLoading] = useState(true);
@@ -28,12 +37,15 @@ function App() {
   const [hazardHistory, setHazardHistory] = useState<HazardEvent[]>([]);
 
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(Boolean(state.isConnected && state.isInternetReachable !== false));
-    });
-
-    return unsubscribe;
-  }, []);
+    const timer = setTimeout(() => {
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setShowSplash(false));
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [splashOpacity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,47 +90,103 @@ function App() {
     };
   }, []);
 
-  const activeScreen = useMemo(() => {
-    if (activeTab === 'Map') {
-      return <MapScreen pins={pins} isLoading={pinsLoading} sourceLabel={pinsSource} />;
-    }
+  const handleVoiceQuery = async (queryText: string): Promise<VoiceQueryResponse> => {
+    return await queryVoiceAgent({
+      user_id: APP_CONFIG.defaultUserId,
+      lat: APP_CONFIG.defaultCenter.lat,
+      lng: APP_CONFIG.defaultCenter.lng,
+      query_text: queryText,
+      recent_hazards: hazardHistory.slice(-3),
+    });
+  };
 
-    if (activeTab === 'Safety') {
-      return <SafetyScreen isOnline={isOnline} />;
-    }
-
+  if (showSplash) {
     return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
+        <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
+          <Text style={styles.splashLogo}>NAVABLE</Text>
+          <Text style={styles.splashText}>Safe. Simple. Empowering.</Text>
+        </Animated.View>
+      </SafeAreaProvider>
+    );
+  }
+
+  let activeScreen;
+  if (activeTab === 'home') {
+    activeScreen = (
       <HomeScreen
         latestHazard={latestHazard}
         recentHazards={hazardHistory}
         isOnline={isOnline}
+        onVoiceQuery={handleVoiceQuery}
+        onMenuPress={() => setAppFlow('profile')}
       />
     );
-  }, [activeTab, hazardHistory, isOnline, latestHazard, pins, pinsLoading, pinsSource]);
+  } else if (activeTab === 'map') {
+    activeScreen = (
+      <MapScreen
+        pins={pins}
+        isLoading={pinsLoading}
+        sourceLabel={pinsSource}
+      />
+    );
+  } else if (activeTab === 'safety') {
+    activeScreen = <SafetyScreen isOnline={isOnline} />;
+  }
+
+  if (appFlow === 'onboarding') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <OnboardingScreen onComplete={() => setAppFlow('auth')} />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (appFlow === 'auth') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <AuthScreen onLogin={() => setAppFlow('main')} />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (appFlow === 'profile') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <ProfileScreen 
+          onClose={() => setAppFlow('main')}
+          onLogout={() => setAppFlow('onboarding')}
+        />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       <View style={styles.container}>
         <OfflineBanner isOnline={isOnline} />
         <View style={styles.content}>{activeScreen}</View>
         <View style={styles.tabBar}>
-          {(['Home', 'Map', 'Safety'] as TabName[]).map(tab => (
-            <Pressable
+          {(['home', 'map', 'safety'] as TabName[]).map(tab => (
+            <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === tab }}
               style={[styles.tabButton, activeTab === tab ? styles.tabButtonActive : null]}
             >
               <Text
                 style={[styles.tabLabel, activeTab === tab ? styles.tabLabelActive : null]}
               >
-                {tab}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           ))}
         </View>
+        <Text style={styles.watermark}>NAVABLE • ACCESSIBILITY FIRST</Text>
       </View>
     </SafeAreaProvider>
   );
@@ -127,36 +195,81 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F9FAFB', // Soft off-white
   },
   content: {
     flex: 1,
   },
   tabBar: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    position: 'absolute',
+    bottom: 30,
+    left: 24,
+    right: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999, // Pill shape
     padding: 8,
     gap: 8,
+    elevation: 8,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    borderWidth: 1,
+    borderColor: '#EFF6FF',
   },
   tabButton: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 999,
+    paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'transparent',
   },
   tabButtonActive: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#2563EB', // Royal Blue
+    elevation: 2,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   tabLabel: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.3,
   },
   tabLabelActive: {
-    color: '#ecfeff',
+    color: '#FFFFFF',
+  },
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#2563EB', // Royal Blue
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashLogo: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 6,
+    marginBottom: 16,
+  },
+  splashText: {
+    fontSize: 18,
+    color: '#DBEAFE',
+    fontWeight: '500',
+    letterSpacing: 1,
+  },
+  watermark: {
+    position: 'absolute',
+    bottom: 8,
+    alignSelf: 'center',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CBD5E1',
+    letterSpacing: 1.5,
+    opacity: 0.8,
   },
 });
 

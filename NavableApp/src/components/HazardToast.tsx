@@ -7,9 +7,9 @@ interface HazardToastProps {
 }
 
 const levelColors: Record<HazardEvent['alert_level'], string> = {
-  high: '#991b1b',
-  medium: '#92400e',
-  low: '#1e3a8a',
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#3b82f6',
 };
 
 export function HazardToast({ event }: HazardToastProps) {
@@ -29,19 +29,28 @@ export function HazardToast({ event }: HazardToastProps) {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffffff30',
   },
   title: {
-    color: '#f8fafc',
-    fontSize: 12,
-    fontWeight: '700',
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   body: {
-    color: '#e2e8f0',
-    fontSize: 15,
-    marginTop: 2,
+    color: '#f8fafc',
+    fontSize: 18,
+    marginTop: 4,
+    fontWeight: '600',
   },
 });

@@ -1,8 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import { PinLegend } from '../components/PinLegend';
-import { APP_CONFIG } from '../config/env';
 import { PinRecord } from '../types/contracts';
 
 interface MapScreenProps {
@@ -11,41 +9,25 @@ interface MapScreenProps {
   sourceLabel: string;
 }
 
-const pinColorByStatus = {
-  green: '#16a34a',
-  amber: '#d97706',
-  red: '#dc2626',
-  grey: '#6b7280',
-} as const;
-
 export function MapScreen({ pins, isLoading, sourceLabel }: MapScreenProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Accessibility Map</Text>
-      <Text style={styles.subtitle}>{sourceLabel}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Accessibility Map</Text>
+        <Text style={styles.subtitle}>{sourceLabel}</Text>
+      </View>
       <PinLegend />
 
-      {isLoading ? <ActivityIndicator color="#0f766e" style={styles.loader} /> : null}
+      {isLoading ? <ActivityIndicator color="#2563EB" style={styles.loader} /> : null}
 
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: APP_CONFIG.defaultCenter.lat,
-          longitude: APP_CONFIG.defaultCenter.lng,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }}
-      >
-        {pins.map(pin => (
-          <Marker
-            key={pin.id}
-            coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-            title={pin.name}
-            description={`Score ${pin.score}/5`}
-            pinColor={pinColorByStatus[pin.status]}
-          />
-        ))}
-      </MapView>
+      <View style={styles.mockMapContainer}>
+        <Text style={styles.mockMapIcon}>🗺️</Text>
+        <Text style={styles.mockMapText}>Interactive Map Offline</Text>
+        <Text style={styles.mockMapSubtext}>Google Maps SDK disabled for Hackathon preview.</Text>
+        <View style={styles.mockStatsRow}>
+          <Text style={styles.mockStatsText}>Loaded {pins.length} active accessibility pins.</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -53,25 +35,71 @@ export function MapScreen({ pins, isLoading, sourceLabel }: MapScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    color: '#475569',
-    paddingHorizontal: 16,
+    color: '#64748B',
     paddingTop: 4,
+    fontSize: 15,
   },
   loader: {
     marginTop: 10,
   },
-  map: {
+  mockMapContainer: {
     flex: 1,
-    marginTop: 8,
+    marginTop: 20,
+    backgroundColor: '#EFF6FF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  mockMapIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  mockMapText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 8,
+  },
+  mockMapSubtext: {
+    fontSize: 15,
+    color: '#3B82F6',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  mockStatsRow: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  mockStatsText: {
+    color: '#2563EB',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
