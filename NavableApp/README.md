@@ -55,6 +55,16 @@ LiveKit placeholders in the same file:
 - `livekitWsUrl`
 - `livekitTokenUrl`
 
+Auth placeholder in the same file:
+
+- `navableApiKey`
+
+Map placeholders in the same file:
+
+- `enableLiveMap`
+- `googleMapsApiKeyAndroid`
+- `googleMapsApiKeyIos`
+
 ## Integration Notes
 
 - ML bridge can call `pushNativeHazardEvent` in `src/services/hazardStreamService.ts`

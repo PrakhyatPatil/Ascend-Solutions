@@ -35,6 +35,8 @@ function App() {
   const [pinsSource, setPinsSource] = useState('Loading map data...');
   const [latestHazard, setLatestHazard] = useState<HazardEvent | null>(null);
   const [hazardHistory, setHazardHistory] = useState<HazardEvent[]>([]);
+  const [activeAgent, setActiveAgent] = useState('navigator');
+  const [conversationHistory, setConversationHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -91,13 +93,36 @@ function App() {
   }, []);
 
   const handleVoiceQuery = async (queryText: string): Promise<VoiceQueryResponse> => {
-    return await queryVoiceAgent({
+    const response = await queryVoiceAgent({
       user_id: APP_CONFIG.defaultUserId,
       lat: APP_CONFIG.defaultCenter.lat,
       lng: APP_CONFIG.defaultCenter.lng,
       query_text: queryText,
+      language: 'auto',
+      active_agent: activeAgent,
+      history: conversationHistory.slice(-8),
       recent_hazards: hazardHistory.slice(-3),
     });
+
+    setConversationHistory(prev => {
+      const next = [
+        ...prev,
+        { role: 'user', content: queryText },
+        { role: 'assistant', content: response.answer_text },
+      ];
+      return next.slice(-20);
+    });
+
+    if (response.active_agent) {
+      setActiveAgent(response.active_agent);
+    }
+
+    if (response.hangup) {
+      setConversationHistory([]);
+      setActiveAgent('navigator');
+    }
+
+    return response;
   };
 
   if (showSplash) {

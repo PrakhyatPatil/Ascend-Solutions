@@ -1,6 +1,8 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { PinLegend } from '../components/PinLegend';
+import { APP_CONFIG } from '../config/env';
 import { PinRecord } from '../types/contracts';
 
 interface MapScreenProps {
@@ -10,6 +12,15 @@ interface MapScreenProps {
 }
 
 export function MapScreen({ pins, isLoading, sourceLabel }: MapScreenProps) {
+  const center = {
+    latitude: APP_CONFIG.defaultCenter.lat,
+    longitude: APP_CONFIG.defaultCenter.lng,
+    latitudeDelta: 0.06,
+    longitudeDelta: 0.06,
+  };
+
+  const isLiveMapEnabled = APP_CONFIG.enableLiveMap;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -20,14 +31,32 @@ export function MapScreen({ pins, isLoading, sourceLabel }: MapScreenProps) {
 
       {isLoading ? <ActivityIndicator color="#2563EB" style={styles.loader} /> : null}
 
-      <View style={styles.mockMapContainer}>
-        <Text style={styles.mockMapIcon}>🗺️</Text>
-        <Text style={styles.mockMapText}>Interactive Map Offline</Text>
-        <Text style={styles.mockMapSubtext}>Google Maps SDK disabled for Hackathon preview.</Text>
-        <View style={styles.mockStatsRow}>
-          <Text style={styles.mockStatsText}>Loaded {pins.length} active accessibility pins.</Text>
+      {isLiveMapEnabled ? (
+        <View style={styles.mapContainer}>
+          <MapView style={styles.map} initialRegion={center}>
+            {pins.map(pin => (
+              <Marker
+                key={pin.id}
+                coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+                title={pin.name}
+                description={`Score ${pin.score} • ${pin.status}`}
+              />
+            ))}
+          </MapView>
+          <View style={styles.mockStatsRow}>
+            <Text style={styles.mockStatsText}>Loaded {pins.length} active accessibility pins.</Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View style={styles.mockMapContainer}>
+          <Text style={styles.mockMapIcon}>🗺️</Text>
+          <Text style={styles.mockMapText}>Interactive Map Offline</Text>
+          <Text style={styles.mockMapSubtext}>Google Maps SDK disabled for Hackathon preview.</Text>
+          <View style={styles.mockStatsRow}>
+            <Text style={styles.mockStatsText}>Loaded {pins.length} active accessibility pins.</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -54,6 +83,19 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 10,
+  },
+  mapContainer: {
+    flex: 1,
+    marginTop: 20,
+    overflow: 'hidden',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    backgroundColor: '#E2E8F0',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
   mockMapContainer: {
     flex: 1,
@@ -85,6 +127,9 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   mockStatsRow: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingVertical: 12,

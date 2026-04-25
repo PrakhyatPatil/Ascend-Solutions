@@ -46,6 +46,12 @@ export interface VoiceQueryRequest {
   lat: number;
   lng: number;
   query_text: string;
+  language?: string;
+  active_agent?: string;
+  history?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
   recent_hazards: Pick<
     HazardEvent,
     'hazard' | 'distance_estimate' | 'direction' | 'alert_level'
@@ -56,6 +62,9 @@ export interface VoiceQueryResponse {
   answer_text: string;
   audio_url: string | null;
   language: string;
+  active_agent?: string;
+  hangup?: boolean;
+  actions?: Array<Record<string, unknown>>;
 }
 
 export interface SosTriggerRequest {

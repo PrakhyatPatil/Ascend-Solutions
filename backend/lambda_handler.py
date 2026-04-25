@@ -15,6 +15,7 @@ bedrock = boto3.client("bedrock-runtime")
 TABLE_NAME = os.getenv("ACCESSIBILITY_PINS_TABLE", "navable-accessibility-pins")
 SOS_TOPIC_ARN = os.getenv("SOS_TOPIC_ARN", "")
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
+NAVABLE_API_KEY = os.getenv("NAVABLE_API_KEY", "").strip()
 
 TAG_PATTERN = re.compile(r"\[(?P<name>[A-Z_]+)(?::(?P<args>[^\]]+))?\]")
 ALLOWED_AGENT_TAGS = {
@@ -70,6 +71,22 @@ def _response(status_code, body):
         "headers": _headers(),
         "body": json.dumps(body),
     }
+
+
+def _is_authorized(event):
+    if not NAVABLE_API_KEY:
+        return True
+
+    headers = event.get("headers") or {}
+    provided_key = headers.get("x-navable-api-key") or headers.get("X-Navable-Api-Key")
+
+    auth_header = headers.get("authorization") or headers.get("Authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        bearer = auth_header[7:].strip()
+        if bearer == NAVABLE_API_KEY:
+            return True
+
+    return provided_key == NAVABLE_API_KEY
 
 
 def _safe_json_loads(raw):
@@ -503,6 +520,9 @@ def lambda_handler(event, _context):
 
     if method == "GET" and path == "/health":
         return _handle_health()
+
+    if not _is_authorized(event):
+        return _response(401, {"ok": False, "error": "Unauthorized"})
 
     if method == "GET" and path == "/pins/nearby":
         return _handle_get_pins(event)
