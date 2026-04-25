@@ -1,0 +1,96 @@
+NAVABLE - HACKATHON BUILD CONTEXT (single source of truth)
+
+DATE
+- April 25, 2026
+
+NORTH STAR
+- Build a voice-first accessibility navigation app for India that helps visually and mobility-impaired users move independently and safely.
+
+ONE-LINE PITCH
+- Navable detects hazards in real time using on-device AI, answers navigation questions by voice, and uses trusted delivery-partner data to map accessibility across the city.
+
+TARGET USERS
+- Visually impaired users
+- Mobility-impaired users
+- Initial demo geography: Indore
+
+MVP FOR JUDGES (must work in live demo)
+1) Live hazard detection from camera with spoken alerts
+2) Accessibility map with color-coded pins (pre-seeded data is acceptable)
+3) Big mic conversational AI agent (Hindi + English acceptable)
+4) SOS action that sends location to trusted contact
+
+CAN BE MOCKED IF TIME IS LOW
+- Delivery partner contribution form
+- Full live family tracking map
+- Polished multilingual tuning
+- User-submitted pin workflow
+
+CORE ARCHITECTURE
+- Mobile app: React Native (fastest path for 24h)
+- Hazard AI: YOLOv8-nano style model, on-device TFLite inference
+- Voice pipeline: STT -> LLM -> TTS
+	- STT: AWS Transcribe
+	- LLM: Amazon Nova Lite on Bedrock
+	- TTS: AWS Polly
+- Backend: AWS Lambda + API Gateway
+- Data: DynamoDB (pins + users)
+- Maps: Google Maps SDK with accessibility overlay
+- SOS: AWS SNS (or equivalent SMS mechanism)
+
+ACCESSIBILITY PIN DATA MODEL (minimum fields)
+- place_id
+- place_name
+- lat, lng
+- entry_access: ramp | step | both | neither
+- lift_status: working | broken | absent
+- path_quality: smooth | uneven | under_construction
+- blockage: clear | blocked
+- accessible_toilet: yes | no
+- score: 1-5
+- last_updated_at
+
+HAZARD EVENT PAYLOAD (minimum)
+{
+	"hazard": "vehicle",
+	"confidence": 0.87,
+	"distance_estimate": "near",
+	"direction": "left",
+	"alert_level": "high"
+}
+
+UI/UX PRIORITIES
+- Large central mic button
+- Large touch targets and high contrast
+- Voice-first flow, minimal typing
+- Clear map pin legend: green/amber/red/grey
+- Fast and obvious SOS action
+
+DEMO SCRIPT (90s)
+0:00-0:20: Show live hazard alert on camera
+0:20-0:40: Show map pins in Indore (seeded)
+0:40-1:05: Ask Hindi question via mic, get voice reply
+1:05-1:20: Trigger SOS and show alert received
+1:20-1:30: Mention hardware roadmap (future, not MVP)
+
+WINNING MESSAGE TO REPEAT
+- This is not just navigation.
+- This is independent mobility for underserved users, built for Indian ground realities.
+
+IMMEDIATE EXECUTION ORDER
+1) Lock UI shell (Map, Mic, SOS) and seeded pins
+2) Integrate hazard event stream -> spoken alert output
+3) Wire mic -> STT -> LLM -> TTS happy path
+4) Implement SOS endpoint + simple phone target
+5) Rehearse demo repeatedly and keep a backup video
+
+CURRENT REPO FACTS
+- context.txt was initially empty; now used as master brief
+- navable_complete_brief.html contains full feature + demo narrative
+- navable_complete_product_brief.html contains deeper data/stack/product details
+- accessible_nav_problem_breakdown.svg captures 3-problem pillars
+- saarthi_full_architecture.svg captures 3-layer architecture and reward loop
+
+KNOWN NAMING NOTE
+- One SVG still says "Saarthi". Use "Navable" consistently in demo/pitch.
+

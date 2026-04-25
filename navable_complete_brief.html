@@ -1,0 +1,200 @@
+
+<style>
+*{box-sizing:border-box;}
+.sec{margin:0 0 1.75rem;}
+.sec-title{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:0 0 .6rem;}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem;}
+.tag{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px;margin:2px 3px 2px 0;}
+.tag-p{background:#EEEDFE;color:#3C3489;}
+.tag-b{background:#E6F1FB;color:#0C447C;}
+.tag-g{background:#EAF3DE;color:#27500A;}
+.tag-a{background:#FAEEDA;color:#633806;}
+.tag-c{background:#FAECE7;color:#712B13;}
+.tag-t{background:#E1F5EE;color:#085041;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;}
+.mini{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem;}
+.mini-title{font-size:13px;font-weight:500;color:var(--color-text-primary);margin:0 0 4px;}
+.mini-sub{font-size:12px;color:var(--color-text-secondary);margin:0;line-height:1.5;}
+.stack-row{display:grid;grid-template-columns:130px 1fr;gap:8px;align-items:start;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px;}
+.stack-row:last-child{border-bottom:none;}
+.stack-label{color:var(--color-text-secondary);font-size:12px;padding-top:2px;}
+.flow-step{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary);}
+.flow-step:last-child{border-bottom:none;}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;}
+.diff-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);}
+.diff-row:last-child{border-bottom:none;}
+.check{width:16px;height:16px;border-radius:50%;background:#EAF3DE;color:#27500A;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+@media(prefers-color-scheme:dark){
+  .tag-p{background:#26215C;color:#AFA9EC;}
+  .tag-b{background:#042C53;color:#85B7EB;}
+  .tag-g{background:#173404;color:#97C459;}
+  .tag-a{background:#412402;color:#EF9F27;}
+  .tag-c{background:#4A1B0C;color:#F0997B;}
+  .tag-t{background:#04342C;color:#5DCAA5;}
+  .check{background:#173404;color:#97C459;}
+}
+</style>
+
+<div style="padding:.5rem 0 2rem">
+
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:1.5rem">
+  <div style="width:48px;height:48px;border-radius:14px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500;color:#3C3489">N</div>
+  <div>
+    <p style="font-size:22px;font-weight:500;margin:0;color:var(--color-text-primary)">Navable</p>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0">Navigate independently. Live fully.</p>
+  </div>
+</div>
+
+<!-- CORE FEATURES -->
+<div class="sec">
+  <div class="sec-title">4 core features — what the app actually does</div>
+
+  <div class="card">
+    <div class="flow-step">
+      <div class="step-num" style="background:#FAECE7;color:#712B13">1</div>
+      <div>
+        <p class="mini-title">Live hazard detection</p>
+        <p class="mini-sub">Phone camera runs Prakhyat's YOLOv8-nano model on-device, continuously. Detects obstacles, steps, vehicles on footpath, construction zones. Speaks alerts instantly — no internet needed for this feature. This is the star of your demo.</p>
+        <div style="margin-top:6px"><span class="tag tag-c">On-device TFLite</span><span class="tag tag-c">No latency</span><span class="tag tag-c">Works offline</span></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#EEEDFE;color:#3C3489">2</div>
+      <div>
+        <p class="mini-title">AI voice agent — the big mic button</p>
+        <p class="mini-sub">User holds centre mic button, speaks naturally. App sends voice → AWS Transcribe (STT) → Amazon Nova Lite on Bedrock (reasoning) → AWS Polly (voice back). Agent knows your GPS, nearby accessibility pins, and recent hazards. Answers anything: "Is the entrance accessible?", "Find me a ramp nearby", "Call my sister".</p>
+        <div style="margin-top:6px"><span class="tag tag-p">Amazon Nova Lite</span><span class="tag tag-p">AWS Transcribe</span><span class="tag tag-p">AWS Polly</span></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#E6F1FB;color:#0C447C">3</div>
+      <div>
+        <p class="mini-title">Accessibility map with crowd pins</p>
+        <p class="mini-sub">Google Maps SDK with custom overlay. Every rated location shows a coloured pin — green (accessible), amber (partial), red (not accessible). Delivery partners rate locations in 5 taps via a mini-form in their existing delivery app. Data stored in DynamoDB, served via Lambda API to the map.</p>
+        <div style="margin-top:6px"><span class="tag tag-b">Google Maps SDK</span><span class="tag tag-b">DynamoDB</span><span class="tag tag-b">Lambda API</span></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#EAF3DE;color:#27500A">4</div>
+      <div>
+        <p class="mini-title">Family safety tracking</p>
+        <p class="mini-sub">User shares live GPS with up to 3 trusted contacts. Family sees them on a map in real time. One-press SOS sends location + a 5-second voice clip to all contacts via SMS/WhatsApp link. User controls when sharing is active — not always-on.</p>
+        <div style="margin-top:6px"><span class="tag tag-g">AWS IoT Core</span><span class="tag tag-g">SNS for SMS</span><span class="tag tag-g">Cognito for auth</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AWS ARCHITECTURE -->
+<div class="sec">
+  <div class="sec-title">How AWS stitches it all together</div>
+  <div class="card">
+    <div class="stack-row"><span class="stack-label">Amazon Nova Lite<br><span style="font-size:11px;color:var(--color-text-secondary)">(Bedrock)</span></span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">The brain of the voice agent. Receives: user's spoken question + current GPS + 5 nearest accessibility pins + last 3 hazard detections. Returns a natural language answer. Nova Lite is fast and cheap — perfect for real-time voice.</p></div></div>
+    <div class="stack-row"><span class="stack-label">AWS Transcribe<br><span style="font-size:11px;color:var(--color-text-secondary)">(STT)</span></span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Converts mic audio to text in under 1 second. Supports Hindi + English — critical for Indian users who code-switch mid-sentence ("Yaar, nearest ramp kahan hai?").</p></div></div>
+    <div class="stack-row"><span class="stack-label">AWS Polly<br><span style="font-size:11px;color:var(--color-text-secondary)">(TTS)</span></span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Converts Nova's text response back to natural voice. Use "Kajal" (Hindi neural voice) or "Aditi" for Indian accent. Output plays through earphones immediately.</p></div></div>
+    <div class="stack-row"><span class="stack-label">Lambda + API Gateway</span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">3 functions: (1) handle voice agent pipeline, (2) read/write accessibility pins to DynamoDB, (3) handle SOS trigger. No server to manage — deploy in minutes.</p></div></div>
+    <div class="stack-row"><span class="stack-label">DynamoDB</span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Two tables: <code style="font-size:11px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px">AccessibilityPins</code> (location, score, ratings, timestamp) and <code style="font-size:11px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px">Users</code> (profile, trusted contacts). Queried by GPS bounding box for nearby pins.</code></div></div>
+    <div class="stack-row"><span class="stack-label">AWS SNS</span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">SOS feature — sends SMS to trusted contacts with a Google Maps link of the user's live location. Instant, reliable, no app needed on family's end.</p></div></div>
+    <div class="stack-row"><span class="stack-label">AWS Cognito</span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Phone number OTP login. Works with Indian numbers, no credit card needed from users. Handles sessions.</p></div></div>
+    <div class="stack-row"><span class="stack-label">Google Maps SDK</span><div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Map rendering + routing only. Custom marker layer for accessibility pins. Free tier covers the hackathon easily. Route calculation can use Google Directions API filtered by accessible paths.</p></div></div>
+  </div>
+</div>
+
+<!-- VOICE AGENT FLOW -->
+<div class="sec">
+  <div class="sec-title">Exactly how the mic button works — the full pipeline</div>
+  <div class="card" style="font-size:12px;color:var(--color-text-secondary)">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0">
+      <span class="tag tag-c">User holds mic</span>
+      <span style="color:var(--color-text-secondary)">→</span>
+      <span class="tag tag-p">AWS Transcribe streams audio</span>
+      <span style="color:var(--color-text-secondary)">→</span>
+      <span class="tag tag-p">Lambda builds context prompt</span>
+      <span style="color:var(--color-text-secondary)">→</span>
+      <span class="tag tag-p">Nova Lite on Bedrock reasons</span>
+      <span style="color:var(--color-text-secondary)">→</span>
+      <span class="tag tag-p">AWS Polly speaks response</span>
+      <span style="color:var(--color-text-secondary)">→</span>
+      <span class="tag tag-g">User hears answer in ~2 sec</span>
+    </div>
+    <hr style="border:none;border-top:0.5px solid var(--color-border-tertiary);margin:.75rem 0">
+    <p style="margin:0 0 6px;font-size:12px;font-weight:500;color:var(--color-text-primary)">The context prompt Lambda sends to Nova Lite looks like this:</p>
+    <div style="background:var(--color-background-secondary);border-radius:8px;padding:.75rem;font-size:11px;font-family:var(--font-mono);color:var(--color-text-primary);line-height:1.7">
+      You are Navable, a navigation assistant for visually and mobility-impaired users.<br>
+      User location: 22.7196° N, 75.8577° E (Indore)<br>
+      Nearby pins: Mall entrance [ramp:yes, lift:working, score:4/5, 2h ago], Bus stop [score:2/5, step:yes]<br>
+      Recent hazards detected: vehicle on footpath (30s ago, left side)<br>
+      User asked: "Is the mall entrance accessible?"<br>
+      Reply in 1–2 short sentences. Speak naturally. Mention distance if known.
+    </div>
+  </div>
+</div>
+
+<!-- DIFFERENTIATION -->
+<div class="sec">
+  <div class="sec-title">What makes Navable different — why you win</div>
+  <div class="card">
+    <div class="diff-row"><div class="check">✓</div><div><p style="margin:0;font-size:13px;font-weight:500;color:var(--color-text-primary)">On-device ML — works without internet</p><p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary)">Google Maps needs data. Your hazard detection doesn't. In a basement, metro station, rural area — it still works. This is a real technical moat.</p></div></div>
+    <div class="diff-row"><div class="check">✓</div><div><p style="margin:0;font-size:13px;font-weight:500;color:var(--color-text-primary)">Conversational agent, not a text reader</p><p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary)">Every other accessibility app reads text aloud. Navable lets you have a conversation with your navigation. That's a paradigm shift judges will immediately understand.</p></div></div>
+    <div class="diff-row"><div class="check">✓</div><div><p style="margin:0;font-size:13px;font-weight:500;color:var(--color-text-primary)">Crowd data from a trusted, existing network</p><p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary)">Not random public input (easy to spam). Delivery partners are identity-verified, location-verified, and visit thousands of locations daily. The data is trustworthy by design.</p></div></div>
+    <div class="diff-row"><div class="check">✓</div><div><p style="margin:0;font-size:13px;font-weight:500;color:var(--color-text-primary)">India-first design</p><p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary)">Hindi + English voice support. Detects Indian-specific hazards (vendors on footpaths, auto-rickshaws parked on roads). Built for Indore, scales to every Indian city.</p></div></div>
+    <div class="diff-row"><div class="check">✓</div><div><p style="margin:0;font-size:13px;font-weight:500;color:var(--color-text-primary)">Hardware roadmap — software with a physical future</p><p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary)">The smart cane story makes this fundable. Judges and investors know a hackathon project that could become a ₹500 hardware product sold through NGOs is a real business, not just an app.</p></div></div>
+  </div>
+</div>
+
+<!-- WIN STRATEGY -->
+<div class="sec">
+  <div class="sec-title">How to win — your demo strategy</div>
+  <div class="card">
+    <p style="font-size:13px;font-weight:500;margin:0 0 8px;color:var(--color-text-primary)">Script a 90-second live demo. This is what judges remember.</p>
+    <div class="flow-step">
+      <div class="step-num" style="background:#FAECE7;color:#712B13;font-size:10px">0:00</div>
+      <div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Show the camera view. Walk toward a chair / obstacle. App says: <em style="color:var(--color-text-secondary)">"Obstacle ahead — approximately 1 metre, slightly left."</em> No button pressed. Always on.</p></div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#EEEDFE;color:#3C3489;font-size:10px">0:20</div>
+      <div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Show the map. Point to green and red pins around a real Indore location (pre-seed 5–6 pins for the demo). Explain the delivery partner flow in one sentence.</p></div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#E6F1FB;color:#0C447C;font-size:10px">0:40</div>
+      <div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Press the big mic button. Ask: <em style="color:var(--color-text-secondary)">"Kya yahan mall ka entrance accessible hai?"</em> Agent responds in Hindi in under 2 seconds. Judges' jaws drop.</p></div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num" style="background:#EAF3DE;color:#27500A;font-size:10px">1:05</div>
+      <div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Press SOS. Show the SMS arriving on another phone instantly with a live Maps link. Say: <em style="color:var(--color-text-secondary)">"Family always knows they're safe."</em></p></div>
+    </div>
+    <div class="flow-step" style="border:none">
+      <div class="step-num" style="background:#FAEEDA;color:#633806;font-size:10px">1:20</div>
+      <div><p style="margin:0;font-size:13px;color:var(--color-text-primary)">Show one slide of the smart cane. Say: <em style="color:var(--color-text-secondary)">"Today it's an app. Tomorrow it's a ₹500 clip-on sensor for the cane your grandfather already uses."</em></p></div>
+    </div>
+  </div>
+</div>
+
+<!-- WHAT TO BUILD FIRST -->
+<div class="sec">
+  <div class="sec-title">Build priority — what must work vs what's a bonus</div>
+  <div class="row2">
+    <div class="card">
+      <p style="font-size:13px;font-weight:500;margin:0 0 8px;color:var(--color-text-primary)">Must work for demo</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">✓ Hazard detection on live camera (Prakhyat)</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">✓ Voice agent — mic → Nova → Polly</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">✓ Map with pre-seeded pins (5–6 Indore locations)</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0">✓ SOS SMS trigger</p>
+    </div>
+    <div class="card">
+      <p style="font-size:13px;font-weight:500;margin:0 0 8px;color:var(--color-text-primary)">Build if time allows</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">◯ Delivery partner rating form (can show as mockup)</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">◯ Live family tracking map (can fake with fixed location)</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">◯ Hindi voice fully tuned</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin:0">◯ Pin submission by users</p>
+    </div>
+  </div>
+</div>
+
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem">
+  <p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">One-line pitch for every judge interaction</p>
+  <p style="font-size:14px;color:var(--color-text-primary);margin:0;line-height:1.6">"Navable is the first navigation app built for India's disabled population — it detects hazards in real time using AI, lets you navigate by voice, and uses Zomato's delivery network to map accessibility across every city."</p>
+</div>
+
+</div>

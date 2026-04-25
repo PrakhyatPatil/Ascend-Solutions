@@ -1,0 +1,102 @@
+
+<style>
+.sec{margin:0 0 1.5rem;} .sec-title{font-size:13px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:0 0 .6rem;} .card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem;} .tag{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;margin:0 4px 4px 0;} .tag-coral{background:#FAECE7;color:#712B13;} .tag-purple{background:#EEEDFE;color:#3C3489;} .tag-blue{background:#E6F1FB;color:#0C447C;} .tag-green{background:#EAF3DE;color:#27500A;} .tag-amber{background:#FAEEDA;color:#633806;} .tag-teal{background:#E1F5EE;color:#085041;} .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:.75rem;} .pill-label{font-size:12px;color:var(--color-text-secondary);margin:0 0 4px;} .big{font-size:22px;font-weight:500;color:var(--color-text-primary);margin:0;} .sub{font-size:13px;color:var(--color-text-secondary);margin:4px 0 0;} .divider{border:none;border-top:0.5px solid var(--color-border-tertiary);margin:1rem 0;} .data-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);} .data-row:last-child{border-bottom:none;} .data-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;} .stack-row{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:start;padding:7px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:13px;} .stack-row:last-child{border-bottom:none;} .stack-label{color:var(--color-text-secondary);font-size:12px;}
+@media(prefers-color-scheme:dark){.tag-coral{background:#4A1B0C;color:#F0997B;}.tag-purple{background:#26215C;color:#AFA9EC;}.tag-blue{background:#042C53;color:#85B7EB;}.tag-green{background:#173404;color:#97C459;}.tag-amber{background:#412402;color:#EF9F27;}.tag-teal{background:#04342C;color:#5DCAA5;}}
+</style>
+
+<div style="padding:.5rem 0 2rem">
+
+<div class="sec">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+    <div style="width:44px;height:44px;border-radius:12px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:#3C3489;">N</div>
+    <div><p style="font-size:20px;font-weight:500;margin:0;color:var(--color-text-primary)">Navable</p><p style="font-size:13px;color:var(--color-text-secondary);margin:0">Navigate independently. Live fully.</p></div>
+  </div>
+  <div class="row">
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:1rem;"><div class="pill-label">tagline</div><div class="big" style="font-size:16px">"Eyes on the road, always — for everyone."</div></div>
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:1rem;"><div class="pill-label">mission</div><div class="big" style="font-size:16px">Independence is a right, not a privilege.</div></div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">What data does the delivery network actually collect?</div>
+  <div class="card">
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 .75rem">Delivery partners see a simple in-app prompt when they arrive at or leave a location. Takes under 30 seconds. 5 data points per visit.</p>
+    <div class="data-row"><div class="data-dot" style="background:#D85A30"></div><div><span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Entry accessibility</span><span style="font-size:12px;color:var(--color-text-secondary);display:block">Does this entrance have a ramp? Step? Both? Neither? (single tap)</span></div></div>
+    <div class="data-row"><div class="data-dot" style="background:#7F77DD"></div><div><span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Lift / elevator status</span><span style="font-size:12px;color:var(--color-text-secondary);display:block">Present and working / broken / absent — timestamped so we know it's current</span></div></div>
+    <div class="data-row"><div class="data-dot" style="background:#378ADD"></div><div><span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Path surface quality</span><span style="font-size:12px;color:var(--color-text-secondary);display:block">Smooth / uneven / under construction — applies to the route from road to entrance</span></div></div>
+    <div class="data-row"><div class="data-dot" style="background:#1D9E75"></div><div><span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Parking / obstacle blockage</span><span style="font-size:12px;color:var(--color-text-secondary);display:block">Is the footpath clear? Vehicles / vendors blocking it? (common in Indian cities)</span></div></div>
+    <div class="data-row"><div class="data-dot" style="background:#BA7517"></div><div><span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Accessible toilet present</span><span style="font-size:12px;color:var(--color-text-secondary);display:block">Yes / No — for mobility-impaired users on longer journeys</span></div></div>
+  </div>
+  <div class="card">
+    <p style="font-size:13px;font-weight:500;margin:0 0 6px;color:var(--color-text-primary)">How this appears on the Navable map</p>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px">Every pinned location gets a simple accessibility score (1–5) derived from the 5 data points. The map pin colour reflects the score.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="tag tag-green">Green pin — fully accessible</span>
+      <span class="tag tag-amber">Amber pin — partial (e.g. ramp but no lift)</span>
+      <span class="tag tag-coral">Red pin — not accessible</span>
+      <span class="tag tag-blue">Grey pin — no data yet</span>
+    </div>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:.75rem 0 0">The AI agent can query this data: "Is the mall entrance accessible?" → agent checks pin score + latest timestamp + specific flags → speaks a clear answer.</p>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">Family tracking feature</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div><p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">What it does</p><p style="font-size:12px;color:var(--color-text-secondary);margin:0">Live GPS shared with up to 3 trusted contacts. Family sees user on a map in real time. User can press SOS — sends location + voice clip to all contacts instantly.</p></div>
+      <div><p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">Privacy-first</p><p style="font-size:12px;color:var(--color-text-secondary);margin:0">User controls sharing. One tap to pause. Sharing expires after a set journey duration — not always-on surveillance.</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">Tech stack — AWS-first, Google Maps for map layer</div>
+  <div class="card">
+    <div class="stack-row"><span class="stack-label">Map & routing</span><div><span class="tag tag-blue">Google Maps SDK</span><span style="font-size:12px;color:var(--color-text-secondary)">Industry standard, free tier generous, accessibility pin overlay via custom markers</span></div></div>
+    <div class="stack-row"><span class="stack-label">AI voice agent</span><div><span class="tag tag-purple">AWS Bedrock</span><span style="font-size:12px;color:var(--color-text-secondary)">Claude Haiku or Titan — fast, cheap, uses your credits. Mic → STT → Bedrock → TTS → speaker</span></div></div>
+    <div class="stack-row"><span class="stack-label">Speech-to-text</span><div><span class="tag tag-purple">AWS Transcribe</span><span style="font-size:12px;color:var(--color-text-secondary)">Streaming STT, low latency, Hindi + English support — critical for Indian users</span></div></div>
+    <div class="stack-row"><span class="stack-label">Text-to-speech</span><div><span class="tag tag-purple">AWS Polly</span><span style="font-size:12px;color:var(--color-text-secondary)">Natural voice output. Use "neural" voices. Supports Hindi. Free tier covers hackathon.</span></div></div>
+    <div class="stack-row"><span class="stack-label">Backend / API</span><div><span class="tag tag-purple">AWS Lambda + API Gateway</span><span style="font-size:12px;color:var(--color-text-secondary)">Serverless — no server to manage during the hackathon. Fast to deploy.</span></div></div>
+    <div class="stack-row"><span class="stack-label">Database</span><div><span class="tag tag-purple">AWS DynamoDB</span><span style="font-size:12px;color:var(--color-text-secondary)">Stores accessibility pins, user data, partner ratings. NoSQL, fast, no setup hassle.</span></div></div>
+    <div class="stack-row"><span class="stack-label">Live tracking</span><div><span class="tag tag-purple">AWS IoT Core</span><span style="font-size:12px;color:var(--color-text-secondary)">MQTT websocket for real-time GPS push to family app. Or simple API polling if simpler.</span></div></div>
+    <div class="stack-row"><span class="stack-label">ML model (Prakhyat)</span><div><span class="tag tag-coral">On-device — TensorFlow Lite</span><span style="font-size:12px;color:var(--color-text-secondary)">Runs on Android. No cloud needed. Model file ships with the app.</span></div></div>
+    <div class="stack-row"><span class="stack-label">App framework</span><div><span class="tag tag-teal">React Native</span><span style="font-size:12px;color:var(--color-text-secondary)">One codebase for Android + iOS. Fastest for a 4-person team in 24 hours.</span></div></div>
+    <div class="stack-row"><span class="stack-label">Auth</span><div><span class="tag tag-purple">AWS Cognito</span><span style="font-size:12px;color:var(--color-text-secondary)">Phone number OTP login. Simple, free, already in AWS ecosystem.</span></div></div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">Prakhyat's ML brief — exactly what to build</div>
+  <div class="card">
+    <p style="font-size:13px;font-weight:500;margin:0 0 6px;color:var(--color-text-primary)">Model: YOLOv8-nano → converted to TensorFlow Lite</p>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 10px">Pre-trained on COCO dataset (already knows people, cars, bikes). Fine-tune or just run inference on relevant classes. Runs at ~15–20fps on a mid-range Android phone.</p>
+    <p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">Detect these hazard classes (use COCO + custom):</p>
+    <div style="margin-bottom:10px"><span class="tag tag-coral">step / staircase</span><span class="tag tag-coral">vehicle on footpath</span><span class="tag tag-coral">pothole</span><span class="tag tag-coral">wet floor sign</span><span class="tag tag-coral">construction barrier</span><span class="tag tag-coral">person (crowd)</span></div>
+    <p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">Output format (JSON per frame):</p>
+    <div style="background:var(--color-background-secondary);border-radius:8px;padding:.75rem;font-size:12px;font-family:var(--font-mono);color:var(--color-text-primary)">{ "hazard": "vehicle", "confidence": 0.87, "distance_estimate": "near", "direction": "left", "alert_level": "high" }</div>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:.75rem 0 0">alert_level drives audio: "high" = immediate voice alert, "medium" = earcon tone, "low" = silent log. Distance estimated from bounding box size relative to frame.</p>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">Hardware vision — Navable Smart Cane (post-hackathon)</div>
+  <div class="card">
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 8px">Pitch this in your presentation as the product roadmap. It's what turns a hackathon into a startup.</p>
+    <div class="row">
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem"><p style="font-size:12px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">V1 clip-on sensor</p><p style="font-size:11px;color:var(--color-text-secondary);margin:0">Ultrasonic sensor clips onto any existing cane. Bluetooth to phone. Extends hazard range to 4m. ₹400 BOM cost.</p></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem"><p style="font-size:12px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">V2 integrated cane</p><p style="font-size:11px;color:var(--color-text-secondary);margin:0">Built-in ultrasonic + haptic grip vibration. Folds like a standard cane. No screen. Works standalone + syncs to app.</p></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem"><p style="font-size:12px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">Why cane, not glasses</p><p style="font-size:11px;color:var(--color-text-secondary);margin:0">Canes last decades. No battery anxiety. Already trusted by users. Cultural adoption is zero-friction.</p></div>
+    </div>
+  </div>
+</div>
+
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem">
+  <p style="font-size:13px;font-weight:500;margin:0 0 4px;color:var(--color-text-primary)">Team split (4 people, 24 hours)</p>
+  <div class="stack-row"><span class="stack-label">Prakhyat</span><span style="font-size:12px;color:var(--color-text-secondary)">YOLOv8-nano → TFLite → Android camera integration → hazard JSON output</span></div>
+  <div class="stack-row"><span class="stack-label">Member 2</span><span style="font-size:12px;color:var(--color-text-secondary)">React Native app — map UI, accessibility pins, mic button, audio playback</span></div>
+  <div class="stack-row"><span class="stack-label">Member 3</span><span style="font-size:12px;color:var(--color-text-secondary)">AWS backend — Lambda, DynamoDB, Bedrock agent, Transcribe + Polly pipeline</span></div>
+  <div class="stack-row" style="border:none"><span class="stack-label">Member 4 (you?)</span><span style="font-size:12px;color:var(--color-text-secondary)">Integration + pitch — wire everything together, demo flow, presentation deck</span></div>
+</div>
+
+</div>
