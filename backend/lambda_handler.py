@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import re
 from datetime import datetime, timezone
 
 import boto3
@@ -14,6 +15,15 @@ bedrock = boto3.client("bedrock-runtime")
 TABLE_NAME = os.getenv("ACCESSIBILITY_PINS_TABLE", "navable-accessibility-pins")
 SOS_TOPIC_ARN = os.getenv("SOS_TOPIC_ARN", "")
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
+
+TAG_PATTERN = re.compile(r"\[(?P<name>[A-Z_]+)(?::(?P<args>[^\]]+))?\]")
+ALLOWED_AGENT_TAGS = {
+    "FETCH_PINS",
+    "CHECK_HAZARDS",
+    "SOS_ALERT",
+    "SWITCH_AGENT",
+    "HANGUP",
+}
 
 
 def _headers():
@@ -42,6 +52,59 @@ def _safe_json_loads(raw):
         return {}
 
 
+def _parse_tag_args(raw_args):
+    if not raw_args:
+        return {}
+
+    parsed = {}
+    for token in raw_args.split(","):
+        chunk = token.strip()
+        if not chunk:
+            continue
+        if "=" not in chunk:
+            parsed[chunk.lower()] = True
+            continue
+        key, value = chunk.split("=", 1)
+        parsed[key.strip().lower()] = value.strip()
+    return parsed
+
+
+def _extract_tags(text):
+    if not text:
+        return "", []
+
+    tags = []
+    for match in TAG_PATTERN.finditer(text):
+        name = match.group("name")
+        if name not in ALLOWED_AGENT_TAGS:
+            continue
+        tags.append(
+            {
+                "name": name,
+                "args": _parse_tag_args(match.group("args")),
+                "raw": match.group(0),
+            }
+        )
+
+    spoken_text = TAG_PATTERN.sub("", text)
+    spoken_text = re.sub(r"\s+", " ", spoken_text).strip()
+    return spoken_text, tags
+
+
+def _is_emergency_intent(query_text):
+    lowered = (query_text or "").strip().lower()
+    emergency_tokens = {
+        "help me",
+        "emergency",
+        "sos",
+        "save me",
+        "urgent",
+        "bachao",
+        "madad",
+    }
+    return any(token in lowered for token in emergency_tokens)
+
+
 def _haversine_m(lat1, lon1, lat2, lon2):
     # Simple great-circle distance in meters.
     r = 6371000
@@ -52,6 +115,138 @@ def _haversine_m(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return r * c
+
+
+def _query_nearby_pins(lat, lng, radius_m):
+    table = ddb.Table(TABLE_NAME)
+    result = table.scan()
+    items = result.get("Items", [])
+
+    pins = []
+    for it in items:
+        try:
+            p_lat = float(it.get("lat"))
+            p_lng = float(it.get("lng"))
+        except (TypeError, ValueError):
+            continue
+
+        distance = _haversine_m(lat, lng, p_lat, p_lng)
+        if distance <= radius_m:
+            item = dict(it)
+            item["distance_m"] = round(distance, 1)
+            pins.append(item)
+
+    pins.sort(key=lambda x: x.get("distance_m", 999999))
+    return pins[:25]
+
+
+def _matches_pin_filter(pin, filter_name):
+    if not filter_name:
+        return True
+
+    normalized = str(filter_name).lower()
+    if normalized == "ramp":
+        return pin.get("entry_access") in {"ramp", "both"}
+    if normalized == "lift":
+        return pin.get("lift_status") == "working"
+    if normalized == "toilet":
+        return pin.get("accessible_toilet") == "yes"
+    if normalized in {"clear", "clear_path"}:
+        return pin.get("blockage") == "clear"
+    return True
+
+
+def _trigger_sos(lat, lng, message):
+    maps_url = f"https://maps.google.com/?q={lat},{lng}"
+    full_msg = f"{message} Location: {maps_url}"
+
+    sent = 0
+    publish_error = None
+    mode = "sns"
+    if SOS_TOPIC_ARN:
+        try:
+            sns.publish(TopicArn=SOS_TOPIC_ARN, Message=full_msg, Subject="Navable SOS")
+            sent = 1
+        except ClientError as exc:
+            publish_error = str(exc)
+            mode = "fallback"
+    else:
+        mode = "fallback"
+
+    return {
+        "ok": True,
+        "sent": sent,
+        "tracking_url": maps_url,
+        "error": publish_error,
+        "mode": mode,
+    }
+
+
+def _bedrock_reply(system_prompt, user_payload, max_tokens=120, temperature=0.2):
+    response = bedrock.converse(
+        modelId=BEDROCK_MODEL_ID,
+        system=[{"text": system_prompt}],
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": json.dumps(user_payload, ensure_ascii=False)}],
+            }
+        ],
+        inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
+    )
+
+    output = response.get("output", {}).get("message", {}).get("content", [])
+    answer_text = ""
+    for chunk in output:
+        if "text" in chunk:
+            answer_text += chunk["text"]
+    return answer_text.strip()
+
+
+def _execute_agent_tags(tags, lat, lng, recent_hazards):
+    executed = []
+    for tag in tags:
+        name = tag.get("name")
+        args = tag.get("args", {})
+
+        if name == "FETCH_PINS":
+            radius_m = float(args.get("radius_m", 800))
+            requested_filter = args.get("filter")
+            try:
+                pins = _query_nearby_pins(float(lat), float(lng), radius_m)
+                filtered = [pin for pin in pins if _matches_pin_filter(pin, requested_filter)]
+                executed.append(
+                    {
+                        "tag": name,
+                        "ok": True,
+                        "count": len(filtered),
+                        "pins": filtered[:5],
+                    }
+                )
+            except Exception as exc:
+                executed.append({"tag": name, "ok": False, "error": str(exc)})
+
+        elif name == "CHECK_HAZARDS":
+            executed.append(
+                {
+                    "tag": name,
+                    "ok": True,
+                    "hazards": (recent_hazards or [])[:3],
+                }
+            )
+
+        elif name == "SOS_ALERT":
+            if lat is None or lng is None:
+                executed.append({"tag": name, "ok": False, "error": "lat and lng are required"})
+            else:
+                urgency = args.get("urgency", "high")
+                message = f"Emergency ({urgency})! Please check my live location."
+                executed.append({"tag": name, **_trigger_sos(lat, lng, message)})
+
+        elif name in {"SWITCH_AGENT", "HANGUP"}:
+            executed.append({"tag": name, "ok": True, "meta_only": True, "args": args})
+
+    return executed
 
 
 def _get_method_and_path(event):
@@ -80,28 +275,11 @@ def _handle_get_pins(event):
     except ValueError:
         return _response(400, {"ok": False, "error": "Invalid lat/lng/radius_m"})
 
-    table = ddb.Table(TABLE_NAME)
     try:
-        result = table.scan()
-        items = result.get("Items", [])
+        pins = _query_nearby_pins(lat, lng, radius_m)
     except ClientError as exc:
         return _response(500, {"ok": False, "error": f"DynamoDB scan failed: {str(exc)}"})
-
-    pins = []
-    for it in items:
-        try:
-            p_lat = float(it.get("lat"))
-            p_lng = float(it.get("lng"))
-        except (TypeError, ValueError):
-            continue
-        distance = _haversine_m(lat, lng, p_lat, p_lng)
-        if distance <= radius_m:
-            item = dict(it)
-            item["distance_m"] = round(distance, 1)
-            pins.append(item)
-
-    pins.sort(key=lambda x: x.get("distance_m", 999999))
-    return _response(200, {"ok": True, "pins": pins[:25]})
+    return _response(200, {"ok": True, "pins": pins})
 
 
 def _handle_voice_query(event):
@@ -114,10 +292,30 @@ def _handle_voice_query(event):
     if not query_text:
         return _response(400, {"ok": False, "error": "query_text is required"})
 
+    if _is_emergency_intent(query_text):
+        if lat is None or lng is None:
+            return _response(400, {"ok": False, "error": "lat and lng are required for emergency actions"})
+
+        emergency_result = _trigger_sos(lat, lng, "Emergency! Immediate help requested.")
+        fallback_text = "SOS triggered. Stay where you are if possible; help is being alerted."
+        return _response(
+            200,
+            {
+                "ok": True,
+                "answer_text": fallback_text,
+                "audio_url": None,
+                "language": "auto",
+                "actions": [{"tag": "SOS_ALERT", **emergency_result}],
+            },
+        )
+
     system_prompt = (
-        "You are Navable, a live accessibility navigation assistant for India. "
-        "Respond in 1-2 concise sentences. Prioritize safety. "
-        "If user speaks Hindi, reply in Hindi; otherwise English."
+        "You are Navable live call assistant for accessibility navigation in India. "
+        "Respond in maximum 2 short sentences. No bullets. Safety first. "
+        "Mirror user language (Hindi/English/Hinglish). "
+        "If live data is required, output action tags from this allowlist only: "
+        "[FETCH_PINS], [CHECK_HAZARDS], [SOS_ALERT], [SWITCH_AGENT], [HANGUP]. "
+        "Do not invent data."
     )
 
     user_context = {
@@ -127,23 +325,26 @@ def _handle_voice_query(event):
     }
 
     answer_text = ""
+    actions = []
     try:
-        response = bedrock.converse(
-            modelId=BEDROCK_MODEL_ID,
-            system=[{"text": system_prompt}],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [{"text": json.dumps(user_context, ensure_ascii=False)}],
-                }
-            ],
-            inferenceConfig={"maxTokens": 120, "temperature": 0.2},
-        )
-        output = response.get("output", {}).get("message", {}).get("content", [])
-        for chunk in output:
-            if "text" in chunk:
-                answer_text += chunk["text"]
-        answer_text = answer_text.strip()
+        planner_output = _bedrock_reply(system_prompt, user_context, max_tokens=160, temperature=0.2)
+        spoken_text, tags = _extract_tags(planner_output)
+
+        if tags:
+            actions = _execute_agent_tags(tags, lat, lng, recent_hazards)
+            synthesis_prompt = (
+                "You are Navable. Create one final spoken response for the caller using tool outputs. "
+                "Max 2 short sentences. No bullets. No action tags in output. "
+                "Be explicit about safety if hazards are high."
+            )
+            synthesis_payload = {
+                "user_query": query_text,
+                "tool_results": actions,
+                "draft_spoken_text": spoken_text,
+            }
+            answer_text = _bedrock_reply(synthesis_prompt, synthesis_payload, max_tokens=140, temperature=0.2)
+        else:
+            answer_text = spoken_text or planner_output
     except Exception:
         # Safe fallback keeps demo flow alive if model call fails.
         answer_text = "Network is unstable right now. I can still help with SOS or nearby accessibility pins."
@@ -155,6 +356,7 @@ def _handle_voice_query(event):
             "answer_text": answer_text,
             "audio_url": None,
             "language": "auto",
+            "actions": actions,
         },
     )
 
@@ -168,32 +370,7 @@ def _handle_sos_trigger(event):
     if lat is None or lng is None:
         return _response(400, {"ok": False, "error": "lat and lng are required"})
 
-    maps_url = f"https://maps.google.com/?q={lat},{lng}"
-    full_msg = f"{message} Location: {maps_url}"
-
-    sent = 0
-    publish_error = None
-    mode = "sns"
-    if SOS_TOPIC_ARN:
-        try:
-            sns.publish(TopicArn=SOS_TOPIC_ARN, Message=full_msg, Subject="Navable SOS")
-            sent = 1
-        except ClientError as exc:
-            publish_error = str(exc)
-            mode = "fallback"
-    else:
-        mode = "fallback"
-
-    return _response(
-        200,
-        {
-            "ok": True,
-            "sent": sent,
-            "tracking_url": maps_url,
-            "error": publish_error,
-            "mode": mode,
-        },
-    )
+    return _response(200, _trigger_sos(lat, lng, message))
 
 
 def lambda_handler(event, _context):
