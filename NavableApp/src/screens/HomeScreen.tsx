@@ -11,14 +11,17 @@ interface HomeScreenProps {
   recentHazards: HazardEvent[];
   isOnline: boolean;
   onVoiceQuery: (query: string) => Promise<VoiceQueryResponse>;
+  onDetectNow: () => Promise<string>;
+  onRequestDelivery: () => Promise<string>;
   onMenuPress: () => void;
 }
 
-export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery, onMenuPress }: HomeScreenProps) {
+export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery, onDetectNow, onRequestDelivery, onMenuPress }: HomeScreenProps) {
   const [queryText, setQueryText] = useState('Kya nearby entrance accessible hai?');
   const [answer, setAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [actionStatus, setActionStatus] = useState('');
 
   const previewHazards = useMemo(
     () =>
@@ -46,6 +49,32 @@ export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery
       await speakText(response.answer_text);
     } catch {
       setError('Voice service unavailable. Please retry when online.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRunDetect = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const status = await onDetectNow();
+      setActionStatus(status);
+    } catch {
+      setError('Detection failed. Please retry.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onDelivery = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const status = await onRequestDelivery();
+      setActionStatus(status);
+    } catch {
+      setError('Delivery request failed. Please retry.');
     } finally {
       setIsLoading(false);
     }
@@ -96,24 +125,25 @@ export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery
                 <Text style={styles.cardIcon}>⭐</Text>
                 <Text style={styles.cardText}>Saved Places</Text>
               </View>
-              <View style={styles.gridCard}>
-                <Text style={styles.cardIcon}>⚠️</Text>
-                <Text style={styles.cardText}>Community Alerts</Text>
-              </View>
+              <Pressable style={styles.gridCard} onPress={onRunDetect}>
+                <Text style={styles.cardIcon}>📷</Text>
+                <Text style={styles.cardText}>Detect Hazards</Text>
+              </Pressable>
             </View>
             <View style={styles.gridRow}>
-              <View style={styles.gridCard}>
-                <Text style={styles.cardIcon}>⚙️</Text>
-                <Text style={styles.cardText}>App Settings</Text>
-              </View>
+              <Pressable style={styles.gridCard} onPress={onDelivery}>
+                <Text style={styles.cardIcon}>🛵</Text>
+                <Text style={styles.cardText}>Request Delivery</Text>
+              </Pressable>
               <View style={styles.gridCard}>
                 <Text style={styles.cardIcon}>🗺️</Text>
-                <Text style={styles.cardText}>Offline Maps</Text>
+                <Text style={styles.cardText}>Live Map</Text>
               </View>
             </View>
           </View>
         )}
 
+        {actionStatus ? <Text style={styles.status}>{actionStatus}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         
         <View style={{ height: 100 }} />
@@ -251,6 +281,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#FECACA',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  status: {
+    marginTop: 16,
+    color: '#0C4A6E',
+    backgroundColor: '#ECFEFF',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
     fontWeight: '600',
     textAlign: 'center',
   },

@@ -9,6 +9,10 @@ $Handler = "lambda_handler.lambda_handler"
 $Runtime = "python3.12"
 $Timeout = 20
 $Memory = 512
+$NavableApiKey = $env:NAVABLE_API_KEY
+if (-not $NavableApiKey) {
+    $NavableApiKey = "replace-with-navable-api-key"
+}
 
 $Region = $env:AWS_REGION
 if (-not $Region) {
@@ -91,7 +95,7 @@ aws lambda update-function-configuration `
     --function-name $FunctionName `
     --timeout $Timeout `
     --memory-size $Memory `
-    --environment "Variables={ACCESSIBILITY_PINS_TABLE=$TableName,SOS_TOPIC_ARN=$topicArn,BEDROCK_MODEL_ID=amazon.nova-lite-v1:0}"
+    --environment "Variables={ACCESSIBILITY_PINS_TABLE=$TableName,SOS_TOPIC_ARN=$topicArn,BEDROCK_MODEL_ID=amazon.nova-lite-v1:0,NAVABLE_API_KEY=$NavableApiKey}"
 if ($LASTEXITCODE -ne 0) {
     throw "AWS command failed: update-function-configuration"
 }

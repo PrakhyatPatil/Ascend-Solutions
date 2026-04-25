@@ -5,6 +5,7 @@ import {
   LIVEKIT_WS_URL,
   LIVEKIT_TOKEN_URL,
   ENABLE_LIVE_MAP,
+  ENABLE_MOCK_HAZARDS,
   ENABLE_REMOTE_SOS,
   DEFAULT_USER_ID,
   DEFAULT_CENTER_LAT,
@@ -19,6 +20,7 @@ export const APP_CONFIG = {
   livekitWsUrl: LIVEKIT_WS_URL || 'wss://livekit.yourdomain.com',
   livekitTokenUrl: LIVEKIT_TOKEN_URL || 'https://your-token-lambda-url.lambda-url.us-east-1.on.aws',
   enableLiveMap: ENABLE_LIVE_MAP === 'true',
+  enableMockHazards: ENABLE_MOCK_HAZARDS === 'true',
   enableRemoteSos: ENABLE_REMOTE_SOS === 'true',
   defaultUserId: DEFAULT_USER_ID || 'u_123',
   defaultCenter: {

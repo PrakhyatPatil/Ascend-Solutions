@@ -86,3 +86,33 @@ export interface ApiError {
   error_code: string;
   message: string;
 }
+
+export interface DetectHazardsRequest {
+  lat: number;
+  lng: number;
+  image_url?: string;
+  frame_b64?: string;
+}
+
+export interface DetectHazardsResponse {
+  ok: boolean;
+  hazards: HazardEvent[];
+  provider: string;
+  warning?: string;
+}
+
+export interface DeliveryRequest {
+  user_id: string;
+  lat: number;
+  lng: number;
+  items: string[];
+  dropoff_note?: string;
+}
+
+export interface DeliveryResponse {
+  ok: boolean;
+  delivery_id: string;
+  status: string;
+  eta_minutes: number;
+  tracking_url: string;
+}

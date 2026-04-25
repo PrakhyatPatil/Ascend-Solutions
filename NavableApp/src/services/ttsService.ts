@@ -1,13 +1,25 @@
 import Tts from 'react-native-tts';
 
 let initialized = false;
+let initializationFailed = false;
 
-function ensureInitialized() {
+async function ensureInitialized(): Promise<void> {
   if (initialized) {
     return;
   }
-  Tts.setDefaultRate(0.48);
-  initialized = true;
+
+  if (initializationFailed) {
+    return;
+  }
+
+  try {
+    await Tts.getInitStatus();
+    Tts.setDefaultRate(0.48);
+    initialized = true;
+  } catch (error) {
+    initializationFailed = true;
+    console.warn('TTS initialization failed. Continuing without spoken output.', error);
+  }
 }
 
 export async function speakText(text: string): Promise<void> {
@@ -15,7 +27,16 @@ export async function speakText(text: string): Promise<void> {
     return;
   }
 
-  ensureInitialized();
-  await Tts.stop();
-  Tts.speak(text);
+  await ensureInitialized();
+
+  if (!initialized) {
+    return;
+  }
+
+  try {
+    await Tts.stop();
+    Tts.speak(text);
+  } catch (error) {
+    console.warn('TTS speak failed. Continuing without spoken output.', error);
+  }
 }

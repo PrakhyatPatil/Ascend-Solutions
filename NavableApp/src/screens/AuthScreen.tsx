@@ -9,6 +9,37 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail.includes('@')) {
+      setError('Enter a valid email address.');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      await Promise.resolve(onLogin());
+    } catch (submitError) {
+      console.warn('Auth flow failed', submitError);
+      setError('Authentication failed. Please retry.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView 
@@ -29,9 +60,15 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           placeholder="caretaker@email.com"
           placeholderTextColor="#94A3B8"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={value => {
+            setEmail(value);
+            if (error) {
+              setError('');
+            }
+          }}
           autoCapitalize="none"
           keyboardType="email-address"
+          editable={!isSubmitting}
         />
 
         <Text style={styles.label}>Password</Text>
@@ -40,17 +77,29 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           placeholder="••••••••"
           placeholderTextColor="#94A3B8"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={value => {
+            setPassword(value);
+            if (error) {
+              setError('');
+            }
+          }}
           secureTextEntry
+          editable={!isSubmitting}
         />
 
-        <Pressable style={styles.primaryButton} onPress={onLogin}>
+        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={isSubmitting}>
           <Text style={styles.primaryButtonText}>
-            {isLogin ? 'Sign In' : 'Register Securely'}
+            {isSubmitting ? 'Please wait...' : isLogin ? 'Sign In' : 'Register Securely'}
           </Text>
         </Pressable>
 
-        <Pressable style={styles.toggleButton} onPress={() => setIsLogin(!isLogin)}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <Pressable
+          style={styles.toggleButton}
+          onPress={() => setIsLogin(!isLogin)}
+          disabled={isSubmitting}
+        >
           <Text style={styles.toggleButtonText}>
             {isLogin ? "Don't have an account? Sign up" : "Already registered? Sign in"}
           </Text>
@@ -146,5 +195,17 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
     fontWeight: '600',
     fontSize: 14,
+  },
+  errorText: {
+    marginTop: 12,
+    textAlign: 'center',
+    color: '#B91C1C',
+    fontWeight: '600',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
 });

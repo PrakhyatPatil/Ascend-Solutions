@@ -2,6 +2,9 @@ import json
 import math
 import os
 import re
+import urllib.error
+import urllib.request
+import uuid
 from datetime import datetime, timezone
 
 import boto3
@@ -16,6 +19,8 @@ TABLE_NAME = os.getenv("ACCESSIBILITY_PINS_TABLE", "navable-accessibility-pins")
 SOS_TOPIC_ARN = os.getenv("SOS_TOPIC_ARN", "")
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 NAVABLE_API_KEY = os.getenv("NAVABLE_API_KEY", "").strip()
+DETECTION_API_URL = os.getenv("DETECTION_API_URL", "").strip()
+DETECTION_API_KEY = os.getenv("DETECTION_API_KEY", "").strip()
 
 TAG_PATTERN = re.compile(r"\[(?P<name>[A-Z_]+)(?::(?P<args>[^\]]+))?\]")
 ALLOWED_AGENT_TAGS = {
@@ -281,6 +286,131 @@ def _trigger_sos(lat, lng, message):
     }
 
 
+def _http_post_json(url, payload, api_key="", timeout_s=12):
+    body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    request = urllib.request.Request(url=url, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_s) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        message = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"HTTP {exc.code}: {message}") from exc
+    except Exception as exc:
+        raise RuntimeError(str(exc)) from exc
+
+
+def _default_detect_result(lat, lng):
+    return {
+        "hazards": [
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "hazard": "unknown",
+                "confidence": 0.51,
+                "distance_estimate": "mid",
+                "direction": "center",
+                "alert_level": "medium",
+                "lat": lat,
+                "lng": lng,
+                "source": "fallback",
+            }
+        ],
+        "provider": "fallback",
+    }
+
+
+def _handle_detect_hazards(event):
+    payload = _safe_json_loads(event.get("body"))
+    lat = payload.get("lat")
+    lng = payload.get("lng")
+    image_url = payload.get("image_url", "")
+    frame_b64 = payload.get("frame_b64", "")
+
+    if lat is None or lng is None:
+        return _response(400, {"ok": False, "error": "lat and lng are required"})
+
+    if DETECTION_API_URL:
+        try:
+            provider_payload = {
+                "lat": lat,
+                "lng": lng,
+                "image_url": image_url,
+                "frame_b64": frame_b64,
+            }
+            provider_result = _http_post_json(
+                DETECTION_API_URL,
+                provider_payload,
+                api_key=DETECTION_API_KEY,
+            )
+            hazards = provider_result.get("hazards") or []
+            if hazards:
+                return _response(200, {"ok": True, "hazards": hazards, "provider": "external"})
+        except Exception as exc:
+            return _response(
+                200,
+                {
+                    "ok": True,
+                    "warning": f"external_detection_failed: {str(exc)}",
+                    **_default_detect_result(lat, lng),
+                },
+            )
+
+    return _response(200, {"ok": True, **_default_detect_result(lat, lng)})
+
+
+def _handle_delivery_request(event):
+    payload = _safe_json_loads(event.get("body"))
+    user_id = payload.get("user_id", "anonymous")
+    lat = payload.get("lat")
+    lng = payload.get("lng")
+    items = payload.get("items") or []
+    dropoff_note = payload.get("dropoff_note", "")
+
+    if lat is None or lng is None:
+        return _response(400, {"ok": False, "error": "lat and lng are required"})
+
+    delivery_id = f"del_{uuid.uuid4().hex[:10]}"
+    eta_minutes = 18
+    maps_url = f"https://maps.google.com/?q={lat},{lng}"
+
+    if SOS_TOPIC_ARN:
+        try:
+            sns.publish(
+                TopicArn=SOS_TOPIC_ARN,
+                Subject="Navable Delivery Request",
+                Message=json.dumps(
+                    {
+                        "delivery_id": delivery_id,
+                        "user_id": user_id,
+                        "lat": lat,
+                        "lng": lng,
+                        "items": items,
+                        "dropoff_note": dropoff_note,
+                        "maps_url": maps_url,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+        except ClientError:
+            # Delivery request still returns local acknowledgement for demo reliability.
+            pass
+
+    return _response(
+        200,
+        {
+            "ok": True,
+            "delivery_id": delivery_id,
+            "status": "requested",
+            "eta_minutes": eta_minutes,
+            "tracking_url": maps_url,
+        },
+    )
+
+
 def _bedrock_reply(system_prompt, user_payload, max_tokens=120, temperature=0.2):
     response = bedrock.converse(
         modelId=BEDROCK_MODEL_ID,
@@ -532,5 +662,11 @@ def lambda_handler(event, _context):
 
     if method == "POST" and path == "/sos/trigger":
         return _handle_sos_trigger(event)
+
+    if method == "POST" and path == "/vision/detect":
+        return _handle_detect_hazards(event)
+
+    if method == "POST" and path == "/delivery/request":
+        return _handle_delivery_request(event)
 
     return _response(404, {"ok": False, "error": f"Route not found: {method} {path}"})

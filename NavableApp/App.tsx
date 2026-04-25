@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Pressable, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineBanner } from './src/components/OfflineBanner';
@@ -19,6 +19,8 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { APP_CONFIG } from './src/config/env';
 import { queryVoiceAgent } from './src/services/voiceService';
+import { detectHazards } from './src/services/detectionService';
+import { requestDelivery } from './src/services/deliveryService';
 import { HazardEvent, PinRecord, VoiceQueryResponse } from './src/types/contracts';
 
 type TabName = 'home' | 'map' | 'safety';
@@ -50,6 +52,20 @@ function App() {
   }, [splashOpacity]);
 
   useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const nextOnline = Boolean(state.isConnected) && state.isInternetReachable !== false;
+      setIsOnline(nextOnline);
+    });
+
+    NetInfo.fetch().then(state => {
+      const nextOnline = Boolean(state.isConnected) && state.isInternetReachable !== false;
+      setIsOnline(nextOnline);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function syncPins() {
@@ -76,19 +92,28 @@ function App() {
   }, [isOnline]);
 
   useEffect(() => {
-    startMockHazardStream();
+    if (APP_CONFIG.enableMockHazards) {
+      startMockHazardStream();
+    }
+
     const unsubscribe = subscribeToHazards(async event => {
       setLatestHazard(event);
       setHazardHistory(prev => [...prev.slice(-7), event]);
 
       if (event.alert_level === 'high') {
-        await speakText(buildHazardMessage(event));
+        try {
+          await speakText(buildHazardMessage(event));
+        } catch (error) {
+          console.warn('Hazard speech failed. Keeping UI active.', error);
+        }
       }
     });
 
     return () => {
       unsubscribe();
-      stopMockHazardStream();
+      if (APP_CONFIG.enableMockHazards) {
+        stopMockHazardStream();
+      }
     };
   }, []);
 
@@ -125,6 +150,37 @@ function App() {
     return response;
   };
 
+  const handleDetectNow = async (): Promise<string> => {
+    const response = await detectHazards({
+      lat: APP_CONFIG.defaultCenter.lat,
+      lng: APP_CONFIG.defaultCenter.lng,
+    });
+
+    const topHazard = response.hazards?.[0];
+    if (topHazard) {
+      setLatestHazard(topHazard);
+      setHazardHistory(prev => [...prev.slice(-7), topHazard]);
+      if (topHazard.alert_level === 'high') {
+        await speakText(buildHazardMessage(topHazard));
+      }
+      return `Detection: ${topHazard.hazard} ${topHazard.distance_estimate} ${topHazard.direction}`;
+    }
+
+    return 'Detection complete: no hazards returned.';
+  };
+
+  const handleRequestDelivery = async (): Promise<string> => {
+    const response = await requestDelivery({
+      user_id: APP_CONFIG.defaultUserId,
+      lat: APP_CONFIG.defaultCenter.lat,
+      lng: APP_CONFIG.defaultCenter.lng,
+      items: ['medicines', 'water'],
+      dropoff_note: 'Main entrance',
+    });
+
+    return `Delivery ${response.status}. ETA ${response.eta_minutes} min.`;
+  };
+
   if (showSplash) {
     return (
       <SafeAreaProvider>
@@ -145,6 +201,8 @@ function App() {
         recentHazards={hazardHistory}
         isOnline={isOnline}
         onVoiceQuery={handleVoiceQuery}
+        onDetectNow={handleDetectNow}
+        onRequestDelivery={handleRequestDelivery}
         onMenuPress={() => setAppFlow('profile')}
       />
     );
