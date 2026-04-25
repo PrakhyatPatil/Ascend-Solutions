@@ -260,6 +260,19 @@ def _matches_pin_filter(pin, filter_name):
     return True
 
 
+def _infer_pin_filter_from_query(query_text):
+    lowered = (query_text or "").lower()
+    if any(token in lowered for token in ["ramp", "wheelchair", "entry"]):
+        return "ramp"
+    if any(token in lowered for token in ["lift", "elevator"]):
+        return "lift"
+    if any(token in lowered for token in ["toilet", "washroom", "restroom"]):
+        return "toilet"
+    if any(token in lowered for token in ["clear path", "path clear", "blocked", "obstacle"]):
+        return "clear"
+    return None
+
+
 def _trigger_sos(lat, lng, message):
     maps_url = f"https://maps.google.com/?q={lat},{lng}"
     full_msg = f"{message} Location: {maps_url}"
@@ -432,15 +445,16 @@ def _bedrock_reply(system_prompt, user_payload, max_tokens=120, temperature=0.2)
     return answer_text.strip()
 
 
-def _execute_agent_tags(tags, lat, lng, recent_hazards):
+def _execute_agent_tags(tags, lat, lng, recent_hazards, query_text=""):
     executed = []
+    inferred_pin_filter = _infer_pin_filter_from_query(query_text)
     for tag in tags:
         name = tag.get("name")
         args = tag.get("args", {})
 
         if name == "FETCH_PINS":
             radius_m = float(args.get("radius_m", 800))
-            requested_filter = args.get("filter")
+            requested_filter = args.get("filter") or inferred_pin_filter
             try:
                 pins = _query_nearby_pins(float(lat), float(lng), radius_m)
                 filtered = [pin for pin in pins if _matches_pin_filter(pin, requested_filter)]
@@ -448,6 +462,7 @@ def _execute_agent_tags(tags, lat, lng, recent_hazards):
                     {
                         "tag": name,
                         "ok": True,
+                        "requested_filter": requested_filter,
                         "count": len(filtered),
                         "pins": filtered[:5],
                     }
@@ -591,7 +606,7 @@ def _handle_voice_query(event):
         spoken_text, tags = _extract_tags(planner_output)
 
         if tags:
-            actions = _execute_agent_tags(tags, lat, lng, recent_hazards)
+            actions = _execute_agent_tags(tags, lat, lng, recent_hazards, query_text=query_text)
             synthesis_prompt = (
                 "You are Navable. Create one final spoken response for the caller using tool outputs. "
                 "Max 2 short sentences. No bullets. No action tags in output. "

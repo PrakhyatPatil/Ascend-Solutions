@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(title="navable-livekit-agent-bridge", version="1.0.0")
 
 LAMBDA_BASE_URL = os.getenv("NAVABLE_LAMBDA_BASE_URL", "").rstrip("/")
+NAVABLE_API_KEY = os.getenv("NAVABLE_API_KEY", "").strip()
 SARVAM_STT_URL = os.getenv("SARVAM_STT_URL", "").strip()
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "").strip()
 CARTESIA_TTS_URL = os.getenv("CARTESIA_TTS_URL", "").strip()
@@ -41,6 +42,7 @@ async def health() -> Dict[str, Any]:
         "ok": True,
         "service": "navable-livekit-agent-bridge",
         "lambda_configured": bool(LAMBDA_BASE_URL),
+        "lambda_auth_configured": bool(NAVABLE_API_KEY),
         "sarvam_configured": bool(SARVAM_STT_URL and SARVAM_API_KEY),
         "cartesia_configured": bool(CARTESIA_TTS_URL and CARTESIA_API_KEY),
     }
@@ -52,9 +54,13 @@ async def agent_reply(payload: VoiceQueryRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail="NAVABLE_LAMBDA_BASE_URL is not configured")
 
     url = f"{LAMBDA_BASE_URL}/voice/query"
+    headers = {}
+    if NAVABLE_API_KEY:
+        headers["x-navable-api-key"] = NAVABLE_API_KEY
+
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_S) as client:
         try:
-            response = await client.post(url, json=payload.model_dump())
+            response = await client.post(url, json=payload.model_dump(), headers=headers)
             response.raise_for_status()
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Lambda request failed: {exc}") from exc

@@ -4,6 +4,8 @@ declare module '@env' {
   export const NAVABLE_API_KEY: string;
   export const LIVEKIT_WS_URL: string;
   export const LIVEKIT_TOKEN_URL: string;
+  export const AGENT_BRIDGE_BASE_URL: string;
+  export const USE_AGENT_BRIDGE: string;
   export const ENABLE_LIVE_MAP: string;
   export const ENABLE_MOCK_HAZARDS: string;
   export const ENABLE_REMOTE_SOS: string;
