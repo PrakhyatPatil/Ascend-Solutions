@@ -21,8 +21,37 @@ ALLOWED_AGENT_TAGS = {
     "FETCH_PINS",
     "CHECK_HAZARDS",
     "SOS_ALERT",
+    "FETCH_DATA",
+    "WEB_SEARCH",
     "SWITCH_AGENT",
+    "SWITCH",
     "HANGUP",
+}
+
+AGENT_REGISTRY = {
+    "navigator": {
+        "name": "Navigator",
+        "persona": "Warm and practical route guide for visually and mobility-impaired users.",
+    },
+    "accessibility_expert": {
+        "name": "Accessibility Expert",
+        "persona": "Detailed specialist for ramps, lifts, entries, and accessible facilities.",
+    },
+    "safety_guardian": {
+        "name": "Safety Guardian",
+        "persona": "Urgent and calm safety coach focused on hazards and emergency actions.",
+    },
+}
+
+AGENT_SWITCH_ALIASES = {
+    "navigator": "navigator",
+    "guide": "navigator",
+    "accessibility_expert": "accessibility_expert",
+    "accessibility": "accessibility_expert",
+    "expert": "accessibility_expert",
+    "safety_guardian": "safety_guardian",
+    "safety": "safety_guardian",
+    "guardian": "safety_guardian",
 }
 
 
@@ -69,6 +98,30 @@ def _parse_tag_args(raw_args):
     return parsed
 
 
+def _normalize_agent_key(value):
+    if not value:
+        return "navigator"
+    return AGENT_SWITCH_ALIASES.get(str(value).strip().lower(), "navigator")
+
+
+def _extract_legacy_tags(text):
+    tags = []
+    switch_matches = re.findall(r"\[SWITCH:([^\]]+)\]", text or "", flags=re.IGNORECASE)
+    for target in switch_matches:
+        tags.append(
+            {
+                "name": "SWITCH",
+                "args": {"agent": _normalize_agent_key(target)},
+                "raw": f"[SWITCH:{target}]",
+            }
+        )
+
+    if re.search(r"\[HANGUP\]", text or "", flags=re.IGNORECASE):
+        tags.append({"name": "HANGUP", "args": {}, "raw": "[HANGUP]"})
+
+    return tags
+
+
 def _extract_tags(text):
     if not text:
         return "", []
@@ -86,7 +139,11 @@ def _extract_tags(text):
             }
         )
 
+    tags.extend(_extract_legacy_tags(text))
+
     spoken_text = TAG_PATTERN.sub("", text)
+    spoken_text = re.sub(r"\[SWITCH:[^\]]+\]", "", spoken_text, flags=re.IGNORECASE)
+    spoken_text = re.sub(r"\[HANGUP\]", "", spoken_text, flags=re.IGNORECASE)
     spoken_text = re.sub(r"\s+", " ", spoken_text).strip()
     return spoken_text, tags
 
@@ -103,6 +160,31 @@ def _is_emergency_intent(query_text):
         "madad",
     }
     return any(token in lowered for token in emergency_tokens)
+
+
+def _detect_agent_switch_intent(query_text):
+    lowered = (query_text or "").strip().lower()
+    switch_phrases = {"switch", "connect", "talk to", "speak to", "change agent", "agent"}
+    if not any(phrase in lowered for phrase in switch_phrases):
+        return None
+
+    for alias, canonical in AGENT_SWITCH_ALIASES.items():
+        if alias in lowered:
+            return canonical
+    return None
+
+
+def _build_system_prompt(active_agent, language_hint="auto"):
+    agent = AGENT_REGISTRY.get(active_agent, AGENT_REGISTRY["navigator"])
+    return (
+        f"You are Navable live call assistant in {agent['name']} mode. "
+        f"Persona: {agent['persona']} "
+        "Respond in maximum 2 short sentences. No bullets. Safety first. "
+        f"Preferred language hint: {language_hint}. Mirror user language naturally. "
+        "If live data is needed, emit only allowed action tags. "
+        "Use [SWITCH:<agent_key>] for agent switching and [HANGUP] when user ends call. "
+        "Allowed tags: [FETCH_PINS], [CHECK_HAZARDS], [SOS_ALERT], [FETCH_DATA], [WEB_SEARCH], [SWITCH_AGENT], [SWITCH], [HANGUP]."
+    )
 
 
 def _haversine_m(lat1, lon1, lat2, lon2):
@@ -243,7 +325,31 @@ def _execute_agent_tags(tags, lat, lng, recent_hazards):
                 message = f"Emergency ({urgency})! Please check my live location."
                 executed.append({"tag": name, **_trigger_sos(lat, lng, message)})
 
-        elif name in {"SWITCH_AGENT", "HANGUP"}:
+        elif name in {"FETCH_DATA", "WEB_SEARCH"}:
+            executed.append(
+                {
+                    "tag": name,
+                    "ok": True,
+                    "meta_only": True,
+                    "note": "External data tool requested by planner; no configured provider in this backend.",
+                }
+            )
+
+        elif name in {"SWITCH_AGENT", "SWITCH"}:
+            requested = args.get("agent") or args.get("target") or args.get("mode")
+            if not requested and args:
+                requested = next(iter(args.keys()))
+            target_agent = _normalize_agent_key(requested)
+            executed.append(
+                {
+                    "tag": "SWITCH_AGENT",
+                    "ok": True,
+                    "meta_only": True,
+                    "target_agent": target_agent,
+                }
+            )
+
+        elif name == "HANGUP":
             executed.append({"tag": name, "ok": True, "meta_only": True, "args": args})
 
     return executed
@@ -286,6 +392,10 @@ def _handle_voice_query(event):
     payload = _safe_json_loads(event.get("body"))
     query_text = payload.get("query_text", "")
     recent_hazards = payload.get("recent_hazards", [])
+    history = payload.get("history", [])
+    user_id = payload.get("user_id", "anonymous")
+    language_hint = payload.get("language", "auto")
+    active_agent = _normalize_agent_key(payload.get("active_agent", "navigator"))
     lat = payload.get("lat")
     lng = payload.get("lng")
 
@@ -305,27 +415,30 @@ def _handle_voice_query(event):
                 "answer_text": fallback_text,
                 "audio_url": None,
                 "language": "auto",
+                "active_agent": "safety_guardian",
+                "hangup": False,
                 "actions": [{"tag": "SOS_ALERT", **emergency_result}],
             },
         )
 
-    system_prompt = (
-        "You are Navable live call assistant for accessibility navigation in India. "
-        "Respond in maximum 2 short sentences. No bullets. Safety first. "
-        "Mirror user language (Hindi/English/Hinglish). "
-        "If live data is required, output action tags from this allowlist only: "
-        "[FETCH_PINS], [CHECK_HAZARDS], [SOS_ALERT], [SWITCH_AGENT], [HANGUP]. "
-        "Do not invent data."
-    )
+    switched_by_intent = _detect_agent_switch_intent(query_text)
+    if switched_by_intent:
+        active_agent = switched_by_intent
+
+    system_prompt = _build_system_prompt(active_agent, language_hint)
 
     user_context = {
+        "user_id": user_id,
         "location": {"lat": lat, "lng": lng},
         "recent_hazards": recent_hazards[:3],
+        "history": history[-8:],
+        "active_agent": active_agent,
         "user_query": query_text,
     }
 
     answer_text = ""
     actions = []
+    hangup = False
     try:
         planner_output = _bedrock_reply(system_prompt, user_context, max_tokens=160, temperature=0.2)
         spoken_text, tags = _extract_tags(planner_output)
@@ -341,10 +454,17 @@ def _handle_voice_query(event):
                 "user_query": query_text,
                 "tool_results": actions,
                 "draft_spoken_text": spoken_text,
+                "active_agent": active_agent,
             }
             answer_text = _bedrock_reply(synthesis_prompt, synthesis_payload, max_tokens=140, temperature=0.2)
         else:
             answer_text = spoken_text or planner_output
+
+        switched_action = next((a for a in actions if a.get("tag") == "SWITCH_AGENT" and a.get("target_agent")), None)
+        if switched_action:
+            active_agent = switched_action["target_agent"]
+
+        hangup = any(a.get("tag") == "HANGUP" for a in actions)
     except Exception:
         # Safe fallback keeps demo flow alive if model call fails.
         answer_text = "Network is unstable right now. I can still help with SOS or nearby accessibility pins."
@@ -356,6 +476,8 @@ def _handle_voice_query(event):
             "answer_text": answer_text,
             "audio_url": None,
             "language": "auto",
+            "active_agent": active_agent,
+            "hangup": hangup,
             "actions": actions,
         },
     )
