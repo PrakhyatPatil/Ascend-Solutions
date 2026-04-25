@@ -1,6 +1,8 @@
 export const APP_CONFIG = {
   apiBaseUrl: 'https://6ksep4avie2xopo6wnadojzpni0bwgpo.lambda-url.us-east-1.on.aws',
   apiVersion: '1',
+  livekitWsUrl: 'wss://livekit.yourdomain.com',
+  livekitTokenUrl: 'https://your-token-lambda-url.lambda-url.us-east-1.on.aws',
   enableRemoteSos: false,
   defaultUserId: 'u_123',
   defaultCenter: {

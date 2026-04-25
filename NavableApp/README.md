@@ -50,6 +50,11 @@ Current placeholder:
 
 - `https://example.execute-api.ap-south-1.amazonaws.com/prod`
 
+LiveKit placeholders in the same file:
+
+- `livekitWsUrl`
+- `livekitTokenUrl`
+
 ## Integration Notes
 
 - ML bridge can call `pushNativeHazardEvent` in `src/services/hazardStreamService.ts`

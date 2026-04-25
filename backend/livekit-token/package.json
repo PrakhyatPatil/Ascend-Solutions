@@ -1,0 +1,10 @@
+{
+  "name": "navable-livekit-token",
+  "version": "1.0.0",
+  "description": "Lambda for generating LiveKit access tokens",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "livekit-server-sdk": "^2.15.0"
+  }
+}
