@@ -2,6 +2,9 @@
 .env
 *.env
 
+__pycache__/
+*.pyc
+
 *.zip
 backend/*.zip
 
