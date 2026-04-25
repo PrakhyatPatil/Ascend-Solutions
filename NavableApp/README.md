@@ -59,11 +59,18 @@ Auth placeholder in the same file:
 
 - `navableApiKey`
 
-Map placeholders in the same file:
+Map toggle placeholder in the same file:
 
 - `enableLiveMap`
-- `googleMapsApiKeyAndroid`
-- `googleMapsApiKeyIos`
+
+Android map key is loaded from local-only file (not committed):
+
+- `android/local.properties`
+- Add: `MAPS_API_KEY=your_android_maps_key`
+
+You can also provide Android map key via environment variable while building:
+
+- `MAPS_API_KEY`
 
 ## Integration Notes
 
