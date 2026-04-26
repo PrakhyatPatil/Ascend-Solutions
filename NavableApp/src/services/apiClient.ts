@@ -7,6 +7,6 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'x-api-version': APP_CONFIG.apiVersion,
-    'x-navable-api-key': APP_CONFIG.navableApiKey,
+    ...(APP_CONFIG.navableApiKey ? { 'x-navable-api-key': APP_CONFIG.navableApiKey } : {}),
   },
 });

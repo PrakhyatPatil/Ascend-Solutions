@@ -11,7 +11,7 @@ $Timeout = 20
 $Memory = 512
 $NavableApiKey = $env:NAVABLE_API_KEY
 if (-not $NavableApiKey) {
-    $NavableApiKey = "replace-with-navable-api-key"
+    throw "NAVABLE_API_KEY is required. Set it in your environment before deployment."
 }
 
 $Region = $env:AWS_REGION
