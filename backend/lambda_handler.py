@@ -1,4 +1,5 @@
 import base64
+import hmac
 import json
 import math
 import os
@@ -23,7 +24,7 @@ BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 NAVABLE_API_KEY = os.getenv("NAVABLE_API_KEY", "").strip()
 DETECTION_API_URL = os.getenv("DETECTION_API_URL", "").strip()
 DETECTION_API_KEY = os.getenv("DETECTION_API_KEY", "").strip()
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "sk_n2o2ct96_KdbfQjtJt0ZDdI9r9Mn8SAPE").strip()
+SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "").strip()
 
 TAG_PATTERN = re.compile(r"\[(?P<name>[A-Z_]+)(?::(?P<args>[^\]]+))?\]")
 ALLOWED_AGENT_TAGS = {
@@ -92,18 +93,23 @@ def _response(status_code, body):
 
 def _is_authorized(event):
     if not NAVABLE_API_KEY:
-        return True
+        return False
 
     headers = event.get("headers") or {}
-    provided_key = headers.get("x-navable-api-key") or headers.get("X-Navable-Api-Key")
+    normalized_headers = {
+        str(k).lower(): v for k, v in headers.items() if isinstance(k, str)
+    }
+    provided_key = (normalized_headers.get("x-navable-api-key") or "").strip()
 
-    auth_header = headers.get("authorization") or headers.get("Authorization") or ""
+    auth_header = (normalized_headers.get("authorization") or "").strip()
     if auth_header.lower().startswith("bearer "):
         bearer = auth_header[7:].strip()
-        if bearer == NAVABLE_API_KEY:
+        if bearer and hmac.compare_digest(bearer, NAVABLE_API_KEY):
             return True
 
-    return provided_key == NAVABLE_API_KEY
+    if not provided_key:
+        return False
+    return hmac.compare_digest(provided_key, NAVABLE_API_KEY)
 
 
 def _safe_json_loads(raw):

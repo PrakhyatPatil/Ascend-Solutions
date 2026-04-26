@@ -18,7 +18,7 @@ import {
 export const APP_CONFIG = {
   apiBaseUrl: API_BASE_URL || 'https://6ksep4avie2xopo6wnadojzpni0bwgpo.lambda-url.us-east-1.on.aws',
   apiVersion: API_VERSION || '1',
-  navableApiKey: NAVABLE_API_KEY || 'navable_ZjJnfhGuMiFKSMefFOTyEC4lW9n6lnj8',
+  navableApiKey: NAVABLE_API_KEY || '',
   livekitWsUrl: LIVEKIT_WS_URL || '',
   livekitTokenUrl: LIVEKIT_TOKEN_URL || '',
   agentBridgeBaseUrl: (AGENT_BRIDGE_BASE_URL || '').replace(/\/$/, ''),

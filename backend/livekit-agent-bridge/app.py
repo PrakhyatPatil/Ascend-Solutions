@@ -52,11 +52,11 @@ async def health() -> Dict[str, Any]:
 async def agent_reply(payload: VoiceQueryRequest) -> Dict[str, Any]:
     if not LAMBDA_BASE_URL:
         raise HTTPException(status_code=500, detail="NAVABLE_LAMBDA_BASE_URL is not configured")
+    if not NAVABLE_API_KEY:
+        raise HTTPException(status_code=500, detail="NAVABLE_API_KEY is not configured")
 
     url = f"{LAMBDA_BASE_URL}/voice/query"
-    headers = {}
-    if NAVABLE_API_KEY:
-        headers["x-navable-api-key"] = NAVABLE_API_KEY
+    headers = {"x-navable-api-key": NAVABLE_API_KEY}
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_S) as client:
         try:

@@ -1,11 +1,16 @@
 param(
   [Parameter(Mandatory=$true)]
-  [string]$BaseUrl
+  [string]$BaseUrl,
+  [string]$ApiKey = $env:NAVABLE_API_KEY
 )
 
 $ErrorActionPreference = "Stop"
 
-$headers = @{"x-navable-api-key"="navable_ZjJnfhGuMiFKSMefFOTyEC4lW9n6lnj8"}
+if (-not $ApiKey) {
+  throw "NAVABLE_API_KEY is required. Set it in your environment or pass -ApiKey explicitly."
+}
+
+$headers = @{"x-navable-api-key"=$ApiKey}
 
 Write-Host "Testing health..."
 Invoke-RestMethod -Uri "${BaseUrl}health" -Method GET -Headers $headers | ConvertTo-Json -Depth 10
