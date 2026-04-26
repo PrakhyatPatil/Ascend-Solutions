@@ -1,10 +1,26 @@
-
 .env
 *.env
 
+# Python
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
+# Logs
+*.log
+log.txt
+log_verbose.txt
+
+# React Native / Android
+node_modules/
+NavableApp/android/build/
+NavableApp/android/.gradle/
+NavableApp/android/local.properties
+NavableApp/ios/Pods/
+
+# Artifacts
+*.apk
+*.ipa
 *.zip
 backend/*.zip
-

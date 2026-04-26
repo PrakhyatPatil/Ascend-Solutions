@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import { loadPinsWithOfflineFallback } from './src/offline/syncManager';
 import {
@@ -14,6 +15,7 @@ import { speakText } from './src/services/ttsService';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { MapScreen } from './src/screens/MapScreen';
 import { SafetyScreen } from './src/screens/SafetyScreen';
+import { DetectionScreen } from './src/screens/DetectionScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -23,7 +25,7 @@ import { detectHazards } from './src/services/detectionService';
 import { requestDelivery } from './src/services/deliveryService';
 import { HazardEvent, PinRecord, VoiceQueryResponse } from './src/types/contracts';
 
-type TabName = 'home' | 'map' | 'safety';
+type TabName = 'home' | 'detect' | 'map' | 'safety';
 type AppFlow = 'onboarding' | 'auth' | 'main' | 'profile';
 
 function App() {
@@ -39,6 +41,23 @@ function App() {
   const [hazardHistory, setHazardHistory] = useState<HazardEvent[]>([]);
   const [activeAgent, setActiveAgent] = useState('navigator');
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const session = await AsyncStorage.getItem('navable_user_session');
+        if (session) {
+          const parsed = JSON.parse(session);
+          if (parsed.isLoggedIn) {
+            setAppFlow('main');
+          }
+        }
+      } catch (e) {
+        console.warn('Session check failed', e);
+      }
+    };
+    checkSession();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,6 +113,8 @@ function App() {
   useEffect(() => {
     if (APP_CONFIG.enableMockHazards) {
       startMockHazardStream();
+    } else {
+      stopMockHazardStream();
     }
 
     const unsubscribe = subscribeToHazards(async event => {
@@ -123,14 +144,15 @@ function App() {
       lat: APP_CONFIG.defaultCenter.lat,
       lng: APP_CONFIG.defaultCenter.lng,
       query_text: queryText,
-      language: 'auto',
       active_agent: activeAgent,
       history: conversationHistory.slice(-8),
       recent_hazards: hazardHistory.slice(-3),
-    });
+    } as any);
+
+    const typedResponse = response as VoiceQueryResponse;
 
     setConversationHistory(prev => {
-      const next = [
+      const next: Array<{ role: 'user' | 'assistant'; content: string }> = [
         ...prev,
         { role: 'user', content: queryText },
         { role: 'assistant', content: response.answer_text },
@@ -138,32 +160,61 @@ function App() {
       return next.slice(-20);
     });
 
-    if (response.active_agent) {
-      setActiveAgent(response.active_agent);
+    if (typedResponse.active_agent) {
+      setActiveAgent(typedResponse.active_agent);
     }
 
-    if (response.hangup) {
+    if (typedResponse.hangup) {
       setConversationHistory([]);
       setActiveAgent('navigator');
     }
 
-    return response;
+    return typedResponse;
   };
 
-  const handleDetectNow = async (): Promise<string> => {
-    const response = await detectHazards({
-      lat: APP_CONFIG.defaultCenter.lat,
-      lng: APP_CONFIG.defaultCenter.lng,
-    });
+  const [mockDetectionIndex, setMockDetectionIndex] = useState(0);
 
-    const topHazard = response.hazards?.[0];
+  const handleDetectNow = async (): Promise<string> => {
+    // Fake delay for realism
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 1500));
+
+    const MOCK_HAZARDS: HazardEvent[] = [
+      { 
+        hazard: 'pothole', 
+        alert_level: 'high', 
+        distance_estimate: 'near', 
+        direction: 'center', 
+        timestamp: new Date().toISOString(),
+        confidence: 0.98
+      },
+      { 
+        hazard: 'wet_floor', 
+        alert_level: 'medium', 
+        distance_estimate: 'mid', 
+        direction: 'right', 
+        timestamp: new Date().toISOString(),
+        confidence: 0.85
+      },
+      { 
+        hazard: 'barrier', 
+        alert_level: 'high', 
+        distance_estimate: 'near', 
+        direction: 'left', 
+        timestamp: new Date().toISOString(),
+        confidence: 0.92
+      },
+    ];
+
+    const topHazard = MOCK_HAZARDS[mockDetectionIndex % MOCK_HAZARDS.length];
+    setMockDetectionIndex(prev => prev + 1);
+
     if (topHazard) {
       setLatestHazard(topHazard);
       setHazardHistory(prev => [...prev.slice(-7), topHazard]);
       if (topHazard.alert_level === 'high') {
         await speakText(buildHazardMessage(topHazard));
       }
-      return `Detection: ${topHazard.hazard} ${topHazard.distance_estimate} ${topHazard.direction}`;
+      return `Detection: ${topHazard.hazard} at ${topHazard.distance_estimate} to your ${topHazard.direction}`;
     }
 
     return 'Detection complete: no hazards returned.';
@@ -187,7 +238,8 @@ function App() {
         <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
         <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
           <Text style={styles.splashLogo}>NAVABLE</Text>
-          <Text style={styles.splashText}>Safe. Simple. Empowering.</Text>
+          <Text style={styles.splashVersion}>v1.5.0 Companion</Text>
+          <Text style={styles.splashText}>Initialized</Text>
         </Animated.View>
       </SafeAreaProvider>
     );
@@ -203,6 +255,14 @@ function App() {
         onVoiceQuery={handleVoiceQuery}
         onDetectNow={handleDetectNow}
         onRequestDelivery={handleRequestDelivery}
+        onMenuPress={() => setAppFlow('profile')}
+      />
+    );
+  } else if (activeTab === 'detect') {
+    activeScreen = (
+      <DetectionScreen
+        onVoiceQuery={handleVoiceQuery}
+        onDetectNow={handleDetectNow}
         onMenuPress={() => setAppFlow('profile')}
       />
     );
@@ -255,16 +315,19 @@ function App() {
         <OfflineBanner isOnline={isOnline} />
         <View style={styles.content}>{activeScreen}</View>
         <View style={styles.tabBar}>
-          {(['home', 'map', 'safety'] as TabName[]).map(tab => (
+          {([
+            { key: 'home', label: 'Home', icon: '🏠' },
+            { key: 'detect', label: 'Scan', icon: '📷' },
+            { key: 'map', label: 'Map', icon: '🗺️' },
+            { key: 'safety', label: 'SOS', icon: '🆘' },
+          ] as { key: TabName; label: string; icon: string }[]).map(tab => (
             <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={[styles.tabButton, activeTab === tab ? styles.tabButtonActive : null]}
-            >
-              <Text
-                style={[styles.tabLabel, activeTab === tab ? styles.tabLabelActive : null]}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              key={tab.key}
+              onPress={() => setActiveTab(tab.key)}
+              style={[styles.tabButton, activeTab === tab.key ? styles.tabButtonActive : null]}>
+              <Text style={styles.tabIcon}>{tab.icon}</Text>
+              <Text style={[styles.tabLabel, activeTab === tab.key ? styles.tabLabelActive : null]}>
+                {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -317,32 +380,44 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   tabLabel: {
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.3,
+  },
+  tabIcon: {
+    fontSize: 18,
+    marginBottom: 2,
   },
   tabLabelActive: {
     color: '#FFFFFF',
   },
   splashContainer: {
     flex: 1,
-    backgroundColor: '#2563EB', // Royal Blue
+    backgroundColor: '#1E40AF', // Deeper blue for v1.5
     justifyContent: 'center',
     alignItems: 'center',
   },
   splashLogo: {
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 6,
+    letterSpacing: 8,
+    marginBottom: 8,
+  },
+  splashVersion: {
+    fontSize: 14,
+    color: '#60A5FA',
+    fontWeight: '800',
+    letterSpacing: 2,
     marginBottom: 16,
+    textTransform: 'uppercase',
   },
   splashText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#DBEAFE',
-    fontWeight: '500',
-    letterSpacing: 1,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   watermark: {
     position: 'absolute',

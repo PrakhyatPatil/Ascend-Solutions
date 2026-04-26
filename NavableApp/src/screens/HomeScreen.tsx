@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, PermissionsAndroid } from 'react-native';
+import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
+
 import { APP_CONFIG } from '../config/env';
 import { HazardToast } from '../components/HazardToast';
-import { MicButton } from '../components/MicButton';
-import { speakText } from '../services/ttsService';
+import { speakText, stopSpeaking } from '../services/ttsService';
 import { HazardEvent, VoiceQueryResponse } from '../types/contracts';
 
 interface HomeScreenProps {
@@ -16,42 +17,114 @@ interface HomeScreenProps {
   onMenuPress: () => void;
 }
 
-export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery, onDetectNow, onRequestDelivery, onMenuPress }: HomeScreenProps) {
-  const [queryText, setQueryText] = useState('Kya nearby entrance accessible hai?');
-  const [answer, setAnswer] = useState('');
+export function HomeScreen({ 
+  latestHazard, 
+  recentHazards, 
+  isOnline, 
+  onVoiceQuery, 
+  onDetectNow,
+  onRequestDelivery,
+  onMenuPress 
+}: HomeScreenProps) {
+  const [queryText, setQueryText] = useState('');
+  const [answer, setAnswer] = useState('Hold the big button or type below to speak with Nova.');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState('');
   const [actionStatus, setActionStatus] = useState('');
 
-  const previewHazards = useMemo(
-    () =>
-      recentHazards.slice(-3).map(item => ({
-        hazard: item.hazard,
-        distance_estimate: item.distance_estimate,
-        direction: item.direction,
-        alert_level: item.alert_level,
-      })),
-    [recentHazards],
-  );
+  useEffect(() => {
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = onSpeechError;
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
 
-  const onAskNavable = async () => {
-    if (!queryText.trim()) {
-      return;
+  const onSpeechResults = async (e: SpeechResultsEvent) => {
+    const text = e.value?.[0];
+    if (text) {
+      setQueryText(text);
+      await handleVoiceSubmission(text);
     }
+  };
 
+  const onSpeechError = (e: SpeechErrorEvent) => {
+    console.warn('Voice error:', e.error);
+    setIsRecording(false);
+    if (!isLoading) {
+      setAnswer('Hold the big button to speak with Nova.');
+    }
+  };
+
+  const handleVoiceSubmission = async (textToSubmit: string) => {
+    setIsRecording(false);
     setIsLoading(true);
-    setError('');
-
+    setAnswer('Thinking...');
+    
     try {
-      const response = await onVoiceQuery(queryText);
-
+      const response = await onVoiceQuery(textToSubmit);
       setAnswer(response.answer_text);
       await speakText(response.answer_text);
     } catch {
-      setError('Voice service unavailable. Please retry when online.');
+      setAnswer('Voice service unavailable. Please retry. (Offline)');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const requestMicrophonePermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Microphone Permission',
+          message: 'Navable needs access to your microphone to listen to your requests.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED || granted === 'granted';
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  const onMicPressIn = async () => {
+    try {
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        setAnswer("Microphone permission denied. Unable to listen.");
+        return;
+      }
+      
+      setIsRecording(true);
+      setAnswer('Listening...');
+      setQueryText('');
+      await stopSpeaking();
+      await Voice.start('hi-IN');
+    } catch (e: any) {
+      console.warn("Failed to start mic", e);
+      setIsRecording(false);
+      setAnswer(`Microphone error: ${e?.message || JSON.stringify(e)}`);
+    }
+  };
+
+  const onMicPressOut = async () => {
+    try {
+      if (isRecording) {
+        await Voice.stop();
+      }
+    } catch (e) {
+      console.warn('Error stopping voice', e);
+    }
+  };
+
+  const onAskNavableText = async () => {
+    if (!queryText.trim()) return;
+    await handleVoiceSubmission(queryText);
   };
 
   const onRunDetect = async () => {
@@ -92,62 +165,43 @@ export function HomeScreen({ latestHazard, recentHazards, isOnline, onVoiceQuery
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Good Evening.</Text>
-        <Text style={styles.subtitle}>Navable voice assistant is ready.</Text>
-
+      <View style={styles.content}>
         <HazardToast event={latestHazard} />
+
+        <View style={styles.answerContainer}>
+          {isLoading && !isRecording ? (
+             <ActivityIndicator size="large" color="#2563EB" style={{ marginBottom: 12 }} />
+          ) : null}
+          <Text style={styles.answerText}>{answer}</Text>
+        </View>
 
         <TextInput
           value={queryText}
           onChangeText={setQueryText}
-          editable={!isLoading}
-          placeholder="Ask Navable Assistant..."
+          onSubmitEditing={onAskNavableText}
+          editable={!isLoading && isOnline}
+          placeholder="Type to Navable AI here..."
           placeholderTextColor="#94A3B8"
-          style={styles.input}
+          style={styles.textInput}
           accessibilityLabel="Voice query text"
         />
 
-        <MicButton
-          onPress={onAskNavable}
-          disabled={isLoading || !isOnline}
-          label={isOnline ? 'Ask Navable' : 'Offline: voice API unavailable'}
-        />
-
-        {isLoading ? <ActivityIndicator size="small" color="#2563EB" /> : null}
-        {answer ? <Text style={styles.answer}>{answer}</Text> : null}
-
-        {!isLoading && (
-          <View style={styles.dashboardGrid}>
-            <Text style={styles.gridTitle}>Caretaker Tools</Text>
-            <View style={styles.gridRow}>
-              <View style={styles.gridCard}>
-                <Text style={styles.cardIcon}>⭐</Text>
-                <Text style={styles.cardText}>Saved Places</Text>
-              </View>
-              <Pressable style={styles.gridCard} onPress={onRunDetect}>
-                <Text style={styles.cardIcon}>📷</Text>
-                <Text style={styles.cardText}>Detect Hazards</Text>
-              </Pressable>
-            </View>
-            <View style={styles.gridRow}>
-              <Pressable style={styles.gridCard} onPress={onDelivery}>
-                <Text style={styles.cardIcon}>🛵</Text>
-                <Text style={styles.cardText}>Request Delivery</Text>
-              </Pressable>
-              <View style={styles.gridCard}>
-                <Text style={styles.cardIcon}>🗺️</Text>
-                <Text style={styles.cardText}>Live Map</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {actionStatus ? <Text style={styles.status}>{actionStatus}</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        
-        <View style={{ height: 100 }} />
-      </ScrollView>
+        <Pressable
+          onPressIn={onMicPressIn}
+          onPressOut={onMicPressOut}
+          disabled={!isOnline}
+          style={({ pressed }) => [
+            styles.micButton,
+            isRecording ? styles.micRecording : null,
+            pressed ? styles.micPressed : null,
+            !isOnline && styles.micDisabled
+          ]}>
+          <Text style={styles.micIcon}>{isRecording ? '🎙️' : '🎤'}</Text>
+          <Text style={styles.micLabel}>
+             {isOnline ? (isRecording ? 'LISTENING...' : 'HOLD TO SPEAK') : 'OFFLINE'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -184,27 +238,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#334155',
     borderRadius: 2,
   },
-  scrollContainer: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
     padding: 24,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 40,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
+  answerContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  answerText: {
+    fontSize: 22,
+    fontWeight: '600',
     color: '#0F172A',
-    letterSpacing: -0.5,
-    marginTop: 12,
+    textAlign: 'center',
+    lineHeight: 32,
+    marginBottom: 16,
   },
-  subtitle: {
-    marginTop: 4,
-    marginBottom: 24,
-    color: '#64748B',
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  input: {
+  textInput: {
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 16,
@@ -212,87 +268,53 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     backgroundColor: '#FFFFFF',
     color: '#0F172A',
-    fontSize: 16,
+    fontSize: 18,
     shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 3,
+    width: '100%',
+    marginBottom: 32,
   },
-  answer: {
-    marginTop: 16,
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 20,
-    color: '#1E3A8A',
-    fontWeight: '500',
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  dashboardGrid: {
-    marginTop: 32,
-  },
-  gridTitle: {
-    color: '#64748B',
-    fontWeight: '700',
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 16,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  gridCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center',
+  micButton: {
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    minHeight: 110,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    alignItems: 'center',
+    elevation: 16,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    borderWidth: 8,
+    borderColor: '#BFDBFE',
   },
-  cardIcon: {
-    fontSize: 26,
+  micRecording: {
+    backgroundColor: '#DC2626',
+    borderColor: '#FECACA',
+    shadowColor: '#DC2626',
+  },
+  micPressed: {
+    transform: [{ scale: 0.95 }],
+  },
+  micDisabled: {
+    backgroundColor: '#94A3B8',
+    borderColor: '#E2E8F0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  micIcon: {
+    fontSize: 64,
     marginBottom: 8,
   },
-  cardText: {
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  error: {
-    marginTop: 16,
-    color: '#991B1B',
-    backgroundColor: '#FEF2F2',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  status: {
-    marginTop: 16,
-    color: '#0C4A6E',
-    backgroundColor: '#ECFEFF',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#A5F3FC',
-    fontWeight: '600',
-    textAlign: 'center',
+  micLabel: {
+    color: '#FFF',
+    fontWeight: '900',
+    fontSize: 18,
+    letterSpacing: 2,
+    marginTop: 4,
   },
 });

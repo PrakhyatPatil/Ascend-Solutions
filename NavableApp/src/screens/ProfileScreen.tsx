@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfileScreenProps {
   onClose: () => void;
@@ -7,6 +8,16 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ onClose, onLogout }: ProfileScreenProps) {
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('navable_user_session');
+      onLogout();
+    } catch (e) {
+      console.warn('Logout failed', e);
+      onLogout();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -51,7 +62,7 @@ export function ProfileScreen({ onClose, onLogout }: ProfileScreenProps) {
           <Text style={styles.settingValue}>Manage</Text>
         </View>
 
-        <Pressable style={styles.logoutButton} onPress={onLogout}>
+        <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
         <Text style={styles.appVersion}>Navable Prototype v1.0.0</Text>

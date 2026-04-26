@@ -2,6 +2,7 @@ import { HazardEvent } from '../types/contracts';
 
 type Listener = (event: HazardEvent) => void;
 
+// Module-level singletons — only ONE stream can exist at a time
 const listeners = new Set<Listener>();
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -34,7 +35,6 @@ function emit(event: Omit<HazardEvent, 'timestamp'>) {
     ...event,
     timestamp: new Date().toISOString(),
   };
-
   listeners.forEach(listener => listener(payload));
 }
 
@@ -47,10 +47,9 @@ export function subscribeToHazards(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
-export function startMockHazardStream(intervalMs = 4500): void {
-  if (intervalId) {
-    return;
-  }
+export function startMockHazardStream(intervalMs = 8000): void {
+  // ⚠️ Always stop any existing stream before starting — prevents duplicates
+  stopMockHazardStream();
 
   let idx = 0;
   intervalId = setInterval(() => {
@@ -60,14 +59,25 @@ export function startMockHazardStream(intervalMs = 4500): void {
 }
 
 export function stopMockHazardStream(): void {
-  if (!intervalId) {
-    return;
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
   }
+}
 
-  clearInterval(intervalId);
-  intervalId = null;
+export function isHazardStreamRunning(): boolean {
+  return intervalId !== null;
+}
+
+export function clearAllHazardListeners(): void {
+  listeners.clear();
 }
 
 export function buildHazardMessage(event: HazardEvent): string {
-  return `${event.hazard} ${event.distance_estimate} ${event.direction}`;
+  const distanceMap: Record<string, string> = {
+    near: 'very close',
+    mid: 'ahead',
+    far: 'in the distance',
+  };
+  return `Warning: ${event.hazard} detected ${distanceMap[event.distance_estimate] || event.distance_estimate} on your ${event.direction}`;
 }

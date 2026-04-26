@@ -1,3 +1,4 @@
+import base64
 import json
 import math
 import os
@@ -14,6 +15,7 @@ from botocore.exceptions import ClientError
 ddb = boto3.resource("dynamodb")
 sns = boto3.client("sns")
 bedrock = boto3.client("bedrock-runtime")
+rekognition = boto3.client("rekognition")
 
 TABLE_NAME = os.getenv("ACCESSIBILITY_PINS_TABLE", "navable-accessibility-pins")
 SOS_TOPIC_ARN = os.getenv("SOS_TOPIC_ARN", "")
@@ -21,6 +23,7 @@ BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 NAVABLE_API_KEY = os.getenv("NAVABLE_API_KEY", "").strip()
 DETECTION_API_URL = os.getenv("DETECTION_API_URL", "").strip()
 DETECTION_API_KEY = os.getenv("DETECTION_API_KEY", "").strip()
+SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "sk_n2o2ct96_KdbfQjtJt0ZDdI9r9Mn8SAPE").strip()
 
 TAG_PATTERN = re.compile(r"\[(?P<name>[A-Z_]+)(?::(?P<args>[^\]]+))?\]")
 ALLOWED_AGENT_TAGS = {
@@ -71,10 +74,19 @@ def _headers():
 
 
 def _response(status_code, body):
+    import decimal
+
+    class _DecimalEncoder(json.JSONEncoder):
+        """Convert DynamoDB Decimal to float so lat/lng aren't returned as strings."""
+        def default(self, obj):
+            if isinstance(obj, decimal.Decimal):
+                return float(obj)
+            return super().default(obj)
+
     return {
         "statusCode": status_code,
         "headers": _headers(),
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=_DecimalEncoder),
     }
 
 
@@ -196,17 +208,75 @@ def _detect_agent_switch_intent(query_text):
     return None
 
 
+# ── Sarvam AI language/speaker config (same team keys, reused from VaaniSeva infra)
+SARVAM_LANG_CONFIG = {
+    "hi": {"sarvam_code": "hi-IN", "speaker": "arya"},
+    "en": {"sarvam_code": "en-IN", "speaker": "vidya"},
+    "hinglish": {"sarvam_code": "hi-IN", "speaker": "arya"},
+    "auto": {"sarvam_code": "hi-IN", "speaker": "arya"},
+}
+
+
+def _call_sarvam_tts(text, language="hi"):
+    """Call Sarvam Bulbul v2 TTS. Returns base64 WAV string or None."""
+    if not SARVAM_API_KEY or not text.strip():
+        return None
+    cfg = SARVAM_LANG_CONFIG.get(language, SARVAM_LANG_CONFIG["hi"])
+    clean = re.sub(r"\[.*?\]", "", text).strip()
+    if not clean:
+        return None
+    try:
+        body = json.dumps({
+            "inputs": [clean],
+            "target_language_code": cfg["sarvam_code"],
+            "speaker": cfg["speaker"],
+            "model": "bulbul:v2",
+            "pace": 1.05,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            url="https://api.sarvam.ai/text-to-speech",
+            data=body,
+            headers={"Content-Type": "application/json", "api-subscription-key": SARVAM_API_KEY},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            result = json.loads(r.read().decode("utf-8"))
+        return result.get("audios", [None])[0]
+    except Exception as exc:
+        print(f"Sarvam TTS failed: {exc}")
+        return None
+
+
 def _build_system_prompt(active_agent, language_hint="auto"):
     agent = AGENT_REGISTRY.get(active_agent, AGENT_REGISTRY["navigator"])
-    return (
-        f"You are Navable live call assistant in {agent['name']} mode. "
-        f"Persona: {agent['persona']} "
-        "Respond in maximum 2 short sentences. No bullets. Safety first. "
-        f"Preferred language hint: {language_hint}. Mirror user language naturally. "
-        "If live data is needed, emit only allowed action tags. "
-        "Use [SWITCH:<agent_key>] for agent switching and [HANGUP] when user ends call. "
-        "Allowed tags: [FETCH_PINS], [CHECK_HAZARDS], [SOS_ALERT], [FETCH_DATA], [WEB_SEARCH], [SWITCH_AGENT], [SWITCH], [HANGUP]."
-    )
+    return f"""You are Nova, Navable's AI companion assistant.
+
+Navable is an accessibility navigation app for visually and mobility-impaired users in India.
+You are self-aware: you are Nova, Navable's AI — not VaaniSeva, not any other product.
+Your current specialisation is: {agent['name']} — {agent['persona']}
+
+## YOUR MOST IMPORTANT RULES
+1. Always speak like a warm, caring human companion — never like a database or a robot.
+2. NEVER say you don't have data, you can't help, or you don't know.
+   Instead: ask a warm follow-up, offer to check, or gently suggest the next step.
+3. Mirror the user's language EXACTLY:
+   - User speaks Hindi → you reply in Hindi.
+   - User speaks Hinglish (mixed) → you reply in Hinglish.
+   - User speaks English → you reply in English.
+   - Use feminine Hindi verb forms: करती हूँ, जानती हूँ, मदद कर सकती हूँ.
+4. Maximum 1–2 short spoken sentences per response. No bullet points. No lists. No jargon.
+5. After every normal response, ask exactly ONE warm follow-up question.
+6. EMERGENCY PATH — if user says help/bachao/madad/SOS → emit [SOS_ALERT] immediately, no questions.
+
+## WHEN TO USE TOOLS
+- User asks about nearby ramps/lifts/entrances → emit [FETCH_PINS:filter=ramp]
+- User asks if path is safe → emit [CHECK_HAZARDS]
+- User says emergency/help/bachao → emit [SOS_ALERT:urgency=high]
+- User says stop/bye/band karo → emit [HANGUP]
+
+## LANGUAGE SETTING
+Preferred language hint: {language_hint}. Always mirror what the user actually says.
+"""
 
 
 def _haversine_m(lat1, lon1, lat2, lon2):
@@ -336,6 +406,66 @@ def _default_detect_result(lat, lng):
     }
 
 
+def _label_to_hazard_name(label_name):
+    lowered = (label_name or "").lower()
+    if any(token in lowered for token in ["car", "truck", "bus", "vehicle", "motorcycle", "bicycle"]):
+        return "vehicle"
+    if any(token in lowered for token in ["person", "people", "crowd", "pedestrian"]):
+        return "crowd"
+    if any(token in lowered for token in ["stairs", "stair", "step"]):
+        return "step"
+    if any(token in lowered for token in ["barrier", "fence", "pole"]):
+        return "barrier"
+    if any(token in lowered for token in ["pothole", "hole"]):
+        return "pothole"
+    return "unknown"
+
+
+def _confidence_to_alert(confidence):
+    if confidence >= 0.75:
+        return "high", "near"
+    if confidence >= 0.55:
+        return "medium", "mid"
+    return "low", "far"
+
+
+def _detect_with_rekognition(frame_b64, lat, lng):
+    if not frame_b64:
+        return []
+
+    try:
+        image_bytes = base64.b64decode(frame_b64, validate=True)
+    except Exception:
+        raise RuntimeError("frame_b64 is not valid base64")
+
+    result = rekognition.detect_labels(
+        Image={"Bytes": image_bytes},
+        MaxLabels=10,
+        MinConfidence=45,
+    )
+
+    hazards = []
+    for label in result.get("Labels", [])[:5]:
+        confidence = round(float(label.get("Confidence", 0)) / 100.0, 2)
+        alert_level, distance_estimate = _confidence_to_alert(confidence)
+        hazards.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "hazard": _label_to_hazard_name(label.get("Name", "")),
+                "confidence": confidence,
+                "distance_estimate": distance_estimate,
+                "direction": "center",
+                "alert_level": alert_level,
+                "lat": lat,
+                "lng": lng,
+                "source": "aws-rekognition",
+                "label": label.get("Name", ""),
+            }
+        )
+
+    return hazards
+
+
 def _handle_detect_hazards(event):
     payload = _safe_json_loads(event.get("body"))
     lat = payload.get("lat")
@@ -345,6 +475,28 @@ def _handle_detect_hazards(event):
 
     if lat is None or lng is None:
         return _response(400, {"ok": False, "error": "lat and lng are required"})
+
+    if frame_b64:
+        try:
+            rekognition_hazards = _detect_with_rekognition(frame_b64, lat, lng)
+            if rekognition_hazards:
+                return _response(
+                    200,
+                    {
+                        "ok": True,
+                        "hazards": rekognition_hazards,
+                        "provider": "aws-rekognition",
+                    },
+                )
+        except Exception as exc:
+            return _response(
+                200,
+                {
+                    "ok": True,
+                    "warning": f"rekognition_failed: {str(exc)}",
+                    **_default_detect_result(lat, lng),
+                },
+            )
 
     if DETECTION_API_URL:
         try:
@@ -607,18 +759,21 @@ def _handle_voice_query(event):
 
         if tags:
             actions = _execute_agent_tags(tags, lat, lng, recent_hazards, query_text=query_text)
+            # Human synthesis prompt — Nova explains tool results warmly, not robotically
             synthesis_prompt = (
-                "You are Navable. Create one final spoken response for the caller using tool outputs. "
-                "Max 2 short sentences. No bullets. No action tags in output. "
-                "Be explicit about safety if hazards are high."
+                "You are Nova, Navable's warm AI companion for visually-impaired users. "
+                "Using the tool results below, give ONE warm, spoken response to the user. "
+                "Mirror their language (Hindi/English/Hinglish). Max 2 short sentences. "
+                "Sound like a caring friend, never a database. No bullets or tags in output."
             )
             synthesis_payload = {
                 "user_query": query_text,
                 "tool_results": actions,
                 "draft_spoken_text": spoken_text,
                 "active_agent": active_agent,
+                "language_hint": language_hint,
             }
-            answer_text = _bedrock_reply(synthesis_prompt, synthesis_payload, max_tokens=140, temperature=0.2)
+            answer_text = _bedrock_reply(synthesis_prompt, synthesis_payload, max_tokens=140, temperature=0.6)
         else:
             answer_text = spoken_text or planner_output
 
@@ -628,16 +783,20 @@ def _handle_voice_query(event):
 
         hangup = any(a.get("tag") == "HANGUP" for a in actions)
     except Exception:
-        # Safe fallback keeps demo flow alive if model call fails.
-        answer_text = "Network is unstable right now. I can still help with SOS or nearby accessibility pins."
+        answer_text = "Main yahaan hoon! Abhi network thoda slow hai, lekin main aapki madad karne ke liye taiyaar hoon."
+
+    # Detect language for TTS
+    detected_lang = language_hint if language_hint in ("hi", "en") else "hi"
+    audio_b64 = _call_sarvam_tts(answer_text, detected_lang)
 
     return _response(
         200,
         {
             "ok": True,
             "answer_text": answer_text,
+            "audio_base64": audio_b64,
             "audio_url": None,
-            "language": "auto",
+            "language": detected_lang,
             "active_agent": active_agent,
             "hangup": hangup,
             "actions": actions,
@@ -657,6 +816,17 @@ def _handle_sos_trigger(event):
     return _response(200, _trigger_sos(lat, lng, message))
 
 
+def _handle_voice_tts(event):
+    """POST /voice/tts — calls Sarvam Bulbul v2 and returns audio_base64 WAV."""
+    payload = _safe_json_loads(event.get("body"))
+    text = (payload.get("text") or "").strip()
+    language = (payload.get("language") or "hi").strip()
+    if not text:
+        return _response(400, {"ok": False, "error": "text is required"})
+    audio_b64 = _call_sarvam_tts(text, language)
+    return _response(200, {"ok": True, "audio_base64": audio_b64, "language": language})
+
+
 def lambda_handler(event, _context):
     method, path = _get_method_and_path(event)
 
@@ -674,6 +844,9 @@ def lambda_handler(event, _context):
 
     if method == "POST" and path == "/voice/query":
         return _handle_voice_query(event)
+
+    if method == "POST" and path == "/voice/tts":
+        return _handle_voice_tts(event)
 
     if method == "POST" and path == "/sos/trigger":
         return _handle_sos_trigger(event)
